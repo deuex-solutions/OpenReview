@@ -1,0 +1,18 @@
+{
+  "name": "openreview",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "openreview": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsdown src/main.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openreview/core": "workspace:*"
+  }
+}
