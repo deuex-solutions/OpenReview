@@ -2,6 +2,7 @@
   "name": "openreview",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Open-source agentic code review tool — AI-powered bug detection, sandboxed execution, codebase-aware chat, full GitHub sync",
   "license": "MIT",
   "engines": {
