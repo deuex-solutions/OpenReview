@@ -41,13 +41,14 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 
 ### Week-by-Week Breakdown
 
-#### Week 1 — Foundation
-- Monorepo scaffold (pnpm workspaces, tsdown, Vitest, ESLint 10 flat config + Prettier)
-- `core/config/` — `.env` loader, instruction file reader (REVIEW.md, AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules)
-- `core/github/client.ts` — GitHub API client (axios, PR fetch, diff fetch, file fetch)
-- `core/github/diff.ts` — Diff parser + copy/move detection algorithm
-- `core/github/comments.ts` — Review comment batch poster (replace-not-duplicate strategy)
-- LangGraph.js 1.2 setup and model router (OpenAI / Anthropic / Gemini provider switching)
+#### Week 1 — Foundation ✅ COMPLETE (2026-03-18)
+- ✅ Monorepo scaffold (pnpm workspaces, tsdown, Vitest, ESLint 10 flat config + Prettier)
+- ✅ `core/config/` — `.env` loader, instruction file reader (REVIEW.md, AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules)
+- ✅ `core/github/client.ts` — GitHub API client (axios, PR fetch, diff fetch, file fetch)
+- ✅ `core/github/diff.ts` — Diff parser + copy/move detection algorithm
+- ✅ `core/github/comments.ts` — Review comment batch poster (replace-not-duplicate strategy)
+- ✅ LangGraph.js setup and model router (OpenAI / Anthropic / Gemini provider switching)
+- 65 tests passing, lint clean, typecheck clean, all 3 packages building
 
 #### Week 2 — Fast Mode + Linters
 - `core/review/fast-review.ts` — Single-shot structured LLM review
