@@ -1,80 +1,17 @@
+import {
+  formatInlineComment,
+  formatSummaryComment,
+} from '../review/formatter.js';
+import type { ReviewFinding, ReviewSummary } from '../review/types.js';
+
 import type { GitHubClient } from './client.js';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-
-export interface ReviewFinding {
-  file: string;
-  line: number;
-  side?: 'LEFT' | 'RIGHT';
-  severity: Severity;
-  title: string;
-  explanation: string;
-  suggestedFix?: string;
-}
-
-export interface ReviewSummary {
-  totalFindings: number;
-  bySeverity: Record<Severity, number>;
-  filesReviewed: number;
-  duration: string;
-  mode: 'fast' | 'rlm';
-  highlights?: string[];
-}
+// Re-export types and formatters so existing consumers don't break
+export type { ReviewFinding, ReviewSummary };
+export type { FindingCategory, FindingSeverity, FindingSource, Citation } from '../review/types.js';
+export { formatInlineComment, formatSummaryComment };
 
 const SUMMARY_MARKER = '<!-- openreview-summary -->';
-
-const SEVERITY_BADGES: Record<Severity, string> = {
-  critical: '🔴 **Critical**',
-  high: '🟠 **High**',
-  medium: '🟡 **Medium**',
-  low: '🔵 **Low**',
-  info: 'ℹ️ **Info**',
-};
-
-/* ------------------------------------------------------------------ */
-/*  Markdown formatters                                                */
-/* ------------------------------------------------------------------ */
-
-export function formatInlineComment(finding: ReviewFinding): string {
-  const badge = SEVERITY_BADGES[finding.severity];
-  let body = `${badge}: ${finding.title}\n\n${finding.explanation}`;
-
-  if (finding.suggestedFix) {
-    body += `\n\n**Suggested fix:**\n\`\`\`suggestion\n${finding.suggestedFix}\n\`\`\``;
-  }
-
-  return body;
-}
-
-export function formatSummaryComment(summary: ReviewSummary): string {
-  const rows = (Object.keys(summary.bySeverity) as Severity[])
-    .filter((sev) => summary.bySeverity[sev] > 0)
-    .map((sev) => `| ${SEVERITY_BADGES[sev]} | ${summary.bySeverity[sev]} |`)
-    .join('\n');
-
-  let md = `${SUMMARY_MARKER}\n## OpenReview Summary\n\n`;
-  md += `**Mode:** ${summary.mode} | **Files:** ${summary.filesReviewed} | **Duration:** ${summary.duration}\n\n`;
-
-  if (summary.totalFindings === 0) {
-    md += '✅ No issues found.\n';
-  } else {
-    md += `| Severity | Count |\n|---|---|\n${rows}\n\n`;
-    md += `**Total:** ${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}\n`;
-  }
-
-  if (summary.highlights && summary.highlights.length > 0) {
-    md += '\n### Highlights\n\n';
-    md += summary.highlights.map((h) => `- ${h}`).join('\n');
-    md += '\n';
-  }
-
-  md += '\n---\n*Powered by [OpenReview](https://github.com/openreview)*\n';
-  return md;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Comment Poster                                                     */
@@ -92,8 +29,8 @@ export class CommentPoster {
 
     const comments = findings.map((f) => ({
       path: f.file,
-      line: f.line,
-      side: f.side ?? 'RIGHT',
+      line: f.startLine,
+      side: 'RIGHT' as const,
       body: formatInlineComment(f),
     }));
 
