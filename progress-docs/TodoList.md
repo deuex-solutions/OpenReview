@@ -20,114 +20,114 @@
 ## 1. Repository & Project Scaffold
 
 ### 1.1 Monorepo Setup
-- [ ] Create GitHub repository `openreview` (public, MIT license)
-- [ ] Initialize root `package.json` with pnpm workspaces (`core`, `cli`, `action`)
-- [ ] Add `pnpm-lock.yaml` and `.gitignore` (node_modules, dist, .env, *.json.trace)
-- [ ] Create `tsconfig.base.json` with strict TypeScript settings (target ES2022, moduleResolution Node16)
-- [ ] Create per-package `tsconfig.json` extending base in `core/`, `cli/`, `action/`
-- [ ] Configure `tsdown` in each package for bundling (`dist/index.js`, CJS + ESM dual output)
-- [ ] Configure Vitest (`vitest.config.ts`) with workspace-aware test discovery and native ESM support
-- [ ] Configure ESLint 10 (`eslint.config.js` flat config) — TypeScript rules, import ordering, no-unused-vars
-- [ ] Configure Prettier (`.prettierrc`) — single quotes, 100 char line width, trailing commas
-- [ ] Add `.env.example` with all environment variables documented
-- [ ] Add `web/` directory with `.gitkeep` (Phase 2 placeholder)
-- [ ] Create `.github/workflows/ci.yml` — runs `pnpm lint`, `pnpm typecheck`, `pnpm test` on push and PR
-- [ ] Create `.github/workflows/release.yml` — publishes to npm and creates GitHub release on version tag
-- [ ] Verify pnpm workspaces resolve correctly: `pnpm --filter core build` etc.
+- [x] Create GitHub repository `openreview` (public, MIT license)
+- [x] Initialize root `package.json` with pnpm workspaces (`core`, `cli`, `action`)
+- [x] Add `pnpm-lock.yaml` and `.gitignore` (node_modules, dist, .env, *.json.trace)
+- [x] Create `tsconfig.base.json` with strict TypeScript settings (target ES2022, moduleResolution Node16)
+- [x] Create per-package `tsconfig.json` extending base in `core/`, `cli/`, `action/`
+- [x] Configure `tsdown` in each package for bundling (`dist/index.js`, CJS + ESM dual output)
+- [x] Configure Vitest (`vitest.config.ts`) with workspace-aware test discovery and native ESM support
+- [x] Configure ESLint 10 (`eslint.config.js` flat config) — TypeScript rules, import ordering, no-unused-vars
+- [x] Configure Prettier (`.prettierrc`) — single quotes, 100 char line width, trailing commas
+- [x] Add `.env.example` with all environment variables documented
+- [x] Add `web/` directory with `.gitkeep` (Phase 2 placeholder)
+- [x] Create `.github/workflows/ci.yml` — runs `pnpm lint`, `pnpm typecheck`, `pnpm test` on push and PR
+- [x] Create `.github/workflows/release.yml` — publishes to npm and creates GitHub release on version tag
+- [x] Verify pnpm workspaces resolve correctly: `pnpm --filter core build` etc.
 
 ### 1.2 Folder Structure
-- [ ] Create `core/src/review/` directory
-- [ ] Create `core/src/github/` directory
-- [ ] Create `core/src/chat/` directory
-- [ ] Create `core/src/learnings/` directory
-- [ ] Create `core/src/sandbox/` directory
-- [ ] Create `core/src/config/` directory
-- [ ] Create `core/src/server/` directory
-- [ ] Create `cli/src/commands/` directory
-- [ ] Create `action/src/` directory
-- [ ] Create `SKILL.md`, `REVIEW.md`, `LICENSE` at root
+- [x] Create `core/src/review/` directory
+- [x] Create `core/src/github/` directory
+- [x] Create `core/src/chat/` directory
+- [x] Create `core/src/learnings/` directory
+- [x] Create `core/src/sandbox/` directory
+- [x] Create `core/src/config/` directory
+- [x] Create `core/src/server/` directory
+- [x] Create `cli/src/commands/` directory
+- [x] Create `action/src/` directory
+- [x] Create `SKILL.md`, `REVIEW.md`, `LICENSE` at root
 
 ---
 
 ## 2. Core Configuration System
 
 ### 2.1 Environment Variable Loader (`core/src/config/env.ts`)
-- [ ] Install `dotenv` (v17.x) in `core`
-- [ ] Export typed config object from `.env` with defaults
-- [ ] Validate required vars at startup: at least one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
-- [ ] Throw descriptive error if no LLM API key is set
-- [ ] Parse `INCLUDE_GLOBS` and `EXCLUDE_GLOBS` as string arrays (comma-separated)
-- [ ] Parse boolean vars (`REVIEW_DRAFTS`, `LINTER_ESLINT`, etc.) with `true`/`false` string handling
-- [ ] Expand `~` in `OPENREVIEW_HOME` to absolute path
-- [ ] Export: `config.mainModel`, `config.subModel`, `config.maxIterations`, `config.maxFiles`, etc.
-- [ ] Unit test: config defaults, missing key errors, boolean parsing
+- [x] Install `dotenv` (v17.x) in `core`
+- [x] Export typed config object from `.env` with defaults
+- [x] Validate required vars at startup: at least one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
+- [x] Throw descriptive error if no LLM API key is set
+- [x] Parse `INCLUDE_GLOBS` and `EXCLUDE_GLOBS` as string arrays (comma-separated)
+- [x] Parse boolean vars (`REVIEW_DRAFTS`, `LINTER_ESLINT`, etc.) with `true`/`false` string handling
+- [x] Expand `~` in `OPENREVIEW_HOME` to absolute path
+- [x] Export: `config.mainModel`, `config.subModel`, `config.maxIterations`, `config.maxFiles`, etc.
+- [x] Unit test: config defaults, missing key errors, boolean parsing
 
 ### 2.2 Instruction File Reader (`core/src/config/instructions.ts`)
-- [ ] Implement `findInstructionFiles(repoPath: string): Promise<InstructionFile[]>`
-- [ ] Glob patterns to search: `**/REVIEW.md`, `**/AGENTS.md`, `**/CLAUDE.md`, `**/.cursorrules`, `**/.windsurfrules`
-- [ ] For each file found: record the file path and its directory depth
-- [ ] Apply hierarchical scoping: files at root = global; files in subdirs = scoped to that subtree
-- [ ] Concatenate all instruction content in priority order
-- [ ] Cap total instruction content at 10,000 tokens (use tiktoken or character approximation)
-- [ ] Return `{ globalInstructions: string, scopedInstructions: Map<string, string> }`
-- [ ] Unit test: finds files at correct depths, caps content, empty repo returns defaults
+- [x] Implement `findInstructionFiles(repoPath: string): Promise<InstructionFile[]>`
+- [x] Glob patterns to search: `**/REVIEW.md`, `**/AGENTS.md`, `**/CLAUDE.md`, `**/.cursorrules`, `**/.windsurfrules`
+- [x] For each file found: record the file path and its directory depth
+- [x] Apply hierarchical scoping: files at root = global; files in subdirs = scoped to that subtree
+- [x] Concatenate all instruction content in priority order
+- [x] Cap total instruction content at 10,000 tokens (use tiktoken or character approximation)
+- [x] Return `{ globalInstructions: string, scopedInstructions: Map<string, string> }`
+- [x] Unit test: finds files at correct depths, caps content, empty repo returns defaults
 
 ---
 
 ## 3. GitHub API Client
 
 ### 3.1 GitHub Client (`core/src/github/client.ts`)
-- [ ] Install `axios` (v1.13.x) in `core`
-- [ ] Create `GitHubClient` class taking `{ token: string, owner: string, repo: string }`
-- [ ] Implement `getPR(prNumber: number): Promise<PRMetadata>`
-- [ ] Implement `getPRFiles(prNumber: number): Promise<PRFile[]>` — paginate (100 items/page)
-- [ ] Implement `getPRDiff(prNumber: number): Promise<string>` — raw unified diff
-- [ ] Implement `getFileContent(path: string, ref: string): Promise<string>` — lazy file fetcher
-- [ ] Implement `getFileTree(ref: string): Promise<string[]>` — list all file paths at a ref
-- [ ] Add axios interceptor for rate limit handling: detect 403 + `X-RateLimit-Remaining: 0`, wait until `X-RateLimit-Reset`
-- [ ] Add axios interceptor for retry on 5xx (max 3 retries, exponential backoff)
-- [ ] Add 30-second timeout on all requests
-- [ ] Parse PR URL: extract owner, repo, PR number via regex
-- [ ] Unit test: URL parsing, pagination logic (mock axios), rate limit detection
+- [x] Install `axios` (v1.13.x) in `core`
+- [x] Create `GitHubClient` class taking `{ token: string, owner: string, repo: string }`
+- [x] Implement `getPR(prNumber: number): Promise<PRMetadata>`
+- [x] Implement `getPRFiles(prNumber: number): Promise<PRFile[]>` — paginate (100 items/page)
+- [x] Implement `getPRDiff(prNumber: number): Promise<string>` — raw unified diff
+- [x] Implement `getFileContent(path: string, ref: string): Promise<string>` — lazy file fetcher
+- [x] Implement `getFileTree(ref: string): Promise<string[]>` — list all file paths at a ref
+- [x] Add axios interceptor for rate limit handling: detect 403 + `X-RateLimit-Remaining: 0`, wait until `X-RateLimit-Reset`
+- [x] Add axios interceptor for retry on 5xx (max 3 retries, exponential backoff)
+- [x] Add 30-second timeout on all requests
+- [x] Parse PR URL: extract owner, repo, PR number via regex
+- [x] Unit test: URL parsing, pagination logic (mock axios), rate limit detection
 
 ### 3.2 Diff Parser (`core/src/github/diff.ts`)
-- [ ] Implement `parseDiff(rawDiff: string): ParsedDiff[]`
-- [ ] `ParsedDiff`: `{ file, status, hunks: Hunk[], addedLines: Line[], deletedLines: Line[] }`
-- [ ] Implement copy/move detection: `detectMovesAndCopies(diffs: ParsedDiff[]): MoveEvent[]`
-  - [ ] Tokenize added and deleted blocks
-  - [ ] Compute Jaccard similarity between deleted blocks in file A and added blocks in file B
-  - [ ] Classify as move if similarity > `MOVE_DETECTION_THRESHOLD` (default 0.8) AND source block is absent
-  - [ ] Classify as copy if source block still present
-- [ ] Apply `INCLUDE_GLOBS` / `EXCLUDE_GLOBS` file filtering
-- [ ] Unit test: parse standard unified diff, detect known move, detect known copy, respect globs
+- [x] Implement `parseDiff(rawDiff: string): ParsedDiff[]`
+- [x] `ParsedDiff`: `{ file, status, hunks: Hunk[], addedLines: Line[], deletedLines: Line[] }`
+- [x] Implement copy/move detection: `detectMovesAndCopies(diffs: ParsedDiff[]): MoveEvent[]`
+  - [x] Tokenize added and deleted blocks
+  - [x] Compute Jaccard similarity between deleted blocks in file A and added blocks in file B
+  - [x] Classify as move if similarity > `MOVE_DETECTION_THRESHOLD` (default 0.8) AND source block is absent
+  - [x] Classify as copy if source block still present
+- [x] Apply `INCLUDE_GLOBS` / `EXCLUDE_GLOBS` file filtering
+- [x] Unit test: parse standard unified diff, detect known move, detect known copy, respect globs
 
 ### 3.3 Comment Poster (`core/src/github/comments.ts`)
-- [ ] Implement `postReview(prNumber, findings: ReviewFinding[]): Promise<void>`
-  - [ ] Batch all inline comments into single `POST /pulls/{pr}/reviews` call
-  - [ ] Review state: `COMMENT` (never auto-approve or request changes)
-- [ ] Implement `postSummaryComment(prNumber, summary: ReviewSummary): Promise<void>`
-  - [ ] Search existing PR comments for HTML marker tag `<!-- openreview-summary -->`
-  - [ ] If found: update existing comment (`PATCH /issues/comments/{id}`)
-  - [ ] If not found: create new comment (`POST /issues/{pr}/comments`)
-- [ ] Implement `postChatReply(commentId, reply: string): Promise<void>`
-- [ ] Implement `postAcknowledgement(prNumber, message: string): Promise<void>`
-- [ ] Format summary comment markdown (severity table, file count, duration, trigger hints)
-- [ ] Format inline comment markdown (severity badge, explanation, suggested fix code block)
-- [ ] Unit test: replace-not-duplicate logic, summary format, inline comment format
+- [x] Implement `postReview(prNumber, findings: ReviewFinding[]): Promise<void>`
+  - [x] Batch all inline comments into single `POST /pulls/{pr}/reviews` call
+  - [x] Review state: `COMMENT` (never auto-approve or request changes)
+- [x] Implement `postSummaryComment(prNumber, summary: ReviewSummary): Promise<void>`
+  - [x] Search existing PR comments for HTML marker tag `<!-- openreview-summary -->`
+  - [x] If found: update existing comment (`PATCH /issues/comments/{id}`)
+  - [x] If not found: create new comment (`POST /issues/{pr}/comments`)
+- [x] Implement `postChatReply(commentId, reply: string): Promise<void>`
+- [x] Implement `postAcknowledgement(prNumber, message: string): Promise<void>`
+- [x] Format summary comment markdown (severity table, file count, duration, trigger hints)
+- [x] Format inline comment markdown (severity badge, explanation, suggested fix code block)
+- [x] Unit test: replace-not-duplicate logic, summary format, inline comment format
 
 ---
 
 ## 4. LLM Router & LangGraph Setup
 
 ### 4.1 LLM Router (`core/src/llm/router.ts`)
-- [ ] Install `@langchain/core` (1.1.x), `@langchain/openai` (1.2.x), `@langchain/anthropic` (1.3.x), `@langchain/google-genai` (2.1.x), `@langchain/langgraph` (1.2.x) in `core`
-- [ ] Implement `createLLM(modelId: string): BaseChatModel`
-  - [ ] Parse model string prefix: `gpt-*` → OpenAI, `claude-*` → Anthropic, `gemini-*` → Google
-  - [ ] Instantiate correct LangChain model class with API key from config
-  - [ ] Support any OpenAI-compatible endpoint via `OPENAI_BASE_URL`
-- [ ] Implement `createMainLLM()` and `createSubLLM()` using config values
-- [ ] Add streaming support: return `AsyncIterable<string>` from chat calls
-- [ ] Unit test: model string parsing, correct class instantiation per provider
+- [x] Install `@langchain/core` (1.1.x), `@langchain/openai` (1.2.x), `@langchain/anthropic` (1.3.x), `@langchain/google-genai` (2.1.x), `@langchain/langgraph` (1.2.x) in `core`
+- [x] Implement `createLLM(modelId: string): BaseChatModel`
+  - [x] Parse model string prefix: `gpt-*` → OpenAI, `claude-*` → Anthropic, `gemini-*` → Google
+  - [x] Instantiate correct LangChain model class with API key from config
+  - [x] Support any OpenAI-compatible endpoint via `OPENAI_BASE_URL`
+- [x] Implement `createMainLLM()` and `createSubLLM()` using config values
+- [x] Add streaming support: return `AsyncIterable<string>` from chat calls
+- [x] Unit test: model string parsing, correct class instantiation per provider
 
 ---
 
