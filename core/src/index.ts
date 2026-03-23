@@ -15,6 +15,8 @@ export { CommentPoster } from './github/comments.js';
 
 // Review
 export { runFastReview } from './review/fast-review.js';
+export { SnapshotBuilder } from './review/snapshot.js';
+export type { SnapshotOptions } from './review/snapshot.js';
 export { runLinters, deduplicateFindings } from './review/linters.js';
 export { formatInlineComment, formatSummaryComment } from './review/formatter.js';
 export { sortFindings } from './review/types.js';
