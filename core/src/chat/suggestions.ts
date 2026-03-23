@@ -10,10 +10,7 @@ import type { PRContext } from '../review/types.js';
  * Uses the sub (cheaper) LLM model for cost efficiency.
  * Each suggestion is <= 8 words.
  */
-export async function generateSuggestions(
-  answer: string,
-  context: PRContext,
-): Promise<string[]> {
+export async function generateSuggestions(answer: string, context: PRContext): Promise<string[]> {
   if (!answer.trim()) return [];
 
   const llm = createSubLLM();

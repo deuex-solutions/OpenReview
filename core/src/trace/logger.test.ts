@@ -58,10 +58,9 @@ describe('TraceLogger', () => {
   it('creates traces directory if it does not exist', () => {
     mockExistsSync.mockReturnValue(false);
     createLogger();
-    expect(mockMkdirSync).toHaveBeenCalledWith(
-      join('/tmp/openreview-test', 'traces'),
-      { recursive: true },
-    );
+    expect(mockMkdirSync).toHaveBeenCalledWith(join('/tmp/openreview-test', 'traces'), {
+      recursive: true,
+    });
   });
 
   it('generates a trace file with correct naming convention', () => {

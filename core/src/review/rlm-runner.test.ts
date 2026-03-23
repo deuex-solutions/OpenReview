@@ -187,4 +187,3 @@ describe('RLM Runner', () => {
     expect(findings[0].severity).toBe('investigate');
   });
 });
-

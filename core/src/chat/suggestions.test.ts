@@ -55,7 +55,8 @@ describe('generateSuggestions', () => {
   });
 
   it('returns parsed suggestions from LLM response', async () => {
-    llmResponse = 'How does this affect performance?\nAny edge cases to consider?\nWhat about testing?\nShould we add logging?';
+    llmResponse =
+      'How does this affect performance?\nAny edge cases to consider?\nWhat about testing?\nShould we add logging?';
 
     const { generateSuggestions } = await import('./suggestions.js');
     const suggestions = await generateSuggestions('The code looks fine.', createMockPR());
@@ -68,7 +69,8 @@ describe('generateSuggestions', () => {
   });
 
   it('filters out suggestions longer than 8 words', async () => {
-    llmResponse = 'Short question here?\nThis is a very long question that exceeds the eight word limit significantly\nAnother short one?';
+    llmResponse =
+      'Short question here?\nThis is a very long question that exceeds the eight word limit significantly\nAnother short one?';
 
     const { generateSuggestions } = await import('./suggestions.js');
     const suggestions = await generateSuggestions('Some answer.', createMockPR());

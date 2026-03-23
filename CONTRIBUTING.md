@@ -80,14 +80,14 @@ web/     # Phase 2 placeholder (React 19 + Vite 8)
 
 ## Branch Naming
 
-| Prefix | Use |
-|---|---|
-| `feat/` | New features |
-| `fix/` | Bug fixes |
-| `refactor/` | Code refactoring |
-| `docs/` | Documentation only |
-| `test/` | Test additions or fixes |
-| `chore/` | Build, CI, dependency updates |
+| Prefix      | Use                           |
+| ----------- | ----------------------------- |
+| `feat/`     | New features                  |
+| `fix/`      | Bug fixes                     |
+| `refactor/` | Code refactoring              |
+| `docs/`     | Documentation only            |
+| `test/`     | Test additions or fixes       |
+| `chore/`    | Build, CI, dependency updates |
 
 ## Commit Messages
 
@@ -102,6 +102,7 @@ docs: update CLI examples in README
 ## Reporting Issues
 
 Open an issue on GitHub with:
+
 - Steps to reproduce
 - Expected vs actual behavior
 - Node.js version, OS, and relevant environment details

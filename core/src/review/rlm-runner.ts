@@ -138,7 +138,9 @@ function buildCodeWriterNode() {
     }
 
     return {
-      messages: [{ role: 'human', content: `Code to execute:\n\`\`\`typescript\n${codeBlock}\n\`\`\`` }],
+      messages: [
+        { role: 'human', content: `Code to execute:\n\`\`\`typescript\n${codeBlock}\n\`\`\`` },
+      ],
       iterations: state.iterations,
       llmCalls: state.llmCalls,
       files: state.files,
@@ -366,11 +368,7 @@ function buildRLMSystemPrompt(pr: PRContext): string {
   }
 
   if (pr.learnings.length > 0) {
-    parts.push(
-      '',
-      '## Team Learnings',
-      ...pr.learnings.map((l) => `- ${l}`),
-    );
+    parts.push('', '## Team Learnings', ...pr.learnings.map((l) => `- ${l}`));
   }
 
   return parts.join('\n');
@@ -459,14 +457,13 @@ function parseRLMFindings(text: string): ReviewFinding[] {
     const category = raw.category === 'bug' ? 'bug' : 'flag';
     const severity = isValidSeverity(raw.severity) ? raw.severity : 'investigate';
 
-    const citations =
-      raw.citations
-        ?.filter((c) => c.file && c.startLine)
-        .map((c) => ({
-          file: c.file!,
-          startLine: c.startLine!,
-          endLine: c.endLine ?? c.startLine!,
-        })) ?? [{ file: raw.file, startLine: raw.startLine, endLine: raw.endLine ?? raw.startLine }];
+    const citations = raw.citations
+      ?.filter((c) => c.file && c.startLine)
+      .map((c) => ({
+        file: c.file!,
+        startLine: c.startLine!,
+        endLine: c.endLine ?? c.startLine!,
+      })) ?? [{ file: raw.file, startLine: raw.startLine, endLine: raw.endLine ?? raw.startLine }];
 
     findings.push({
       id: `rlm-${randomUUID().slice(0, 8)}`,

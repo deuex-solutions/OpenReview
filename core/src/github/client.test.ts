@@ -100,9 +100,7 @@ describe('GitHubClient', () => {
         },
       ];
 
-      mockApi.get
-        .mockResolvedValueOnce({ data: page1 })
-        .mockResolvedValueOnce({ data: page2 });
+      mockApi.get.mockResolvedValueOnce({ data: page1 }).mockResolvedValueOnce({ data: page2 });
 
       const files = await client.getPRFiles(1);
       expect(files).toHaveLength(101);

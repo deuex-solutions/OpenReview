@@ -76,9 +76,7 @@ describe('parseEslintOutput', () => {
       },
       {
         filePath: 'b.ts',
-        messages: [
-          { ruleId: 'rule3', severity: 1, message: 'msg3', line: 10, column: 5 },
-        ],
+        messages: [{ ruleId: 'rule3', severity: 1, message: 'msg3', line: 10, column: 5 }],
       },
     ]);
 
@@ -595,16 +593,13 @@ describe('deduplicateFindings', () => {
   });
 
   it('handles multiple AI findings with one linter finding', () => {
-    const ai = [
-      makeFinding('a.ts', 5, 10, 'ai'),
-      makeFinding('a.ts', 20, 25, 'ai'),
-    ];
+    const ai = [makeFinding('a.ts', 5, 10, 'ai'), makeFinding('a.ts', 20, 25, 'ai')];
     const linter = [makeFinding('a.ts', 8, 8, 'linter', 'ESLint')];
 
     const merged = deduplicateFindings(ai, linter);
     expect(merged).toHaveLength(2);
     expect(merged[0].source).toBe('both'); // first AI finding merged
-    expect(merged[1].source).toBe('ai');   // second AI finding unchanged
+    expect(merged[1].source).toBe('ai'); // second AI finding unchanged
   });
 
   it('handles one AI finding matching multiple linter findings', () => {
@@ -621,19 +616,21 @@ describe('deduplicateFindings', () => {
   });
 
   it('preserves AI finding data when merging (title, explanation, etc.)', () => {
-    const ai: ReviewFinding[] = [{
-      id: 'ai-123',
-      category: 'bug',
-      severity: 'severe',
-      file: 'a.ts',
-      startLine: 5,
-      endLine: 10,
-      title: 'AI Title',
-      explanation: 'AI Explanation',
-      suggestedFix: 'fix code',
-      source: 'ai',
-      citations: [{ file: 'a.ts', startLine: 5, endLine: 10 }],
-    }];
+    const ai: ReviewFinding[] = [
+      {
+        id: 'ai-123',
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 5,
+        endLine: 10,
+        title: 'AI Title',
+        explanation: 'AI Explanation',
+        suggestedFix: 'fix code',
+        source: 'ai',
+        citations: [{ file: 'a.ts', startLine: 5, endLine: 10 }],
+      },
+    ];
     const linter = [makeFinding('a.ts', 7, 7, 'linter', 'Semgrep')];
 
     const merged = deduplicateFindings(ai, linter);

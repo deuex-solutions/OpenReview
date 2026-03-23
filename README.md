@@ -65,13 +65,13 @@ npx openreview review --url <PR-URL> --output json
 
 ### GitHub Comment Commands
 
-| Command | Description |
-|---|---|
-| `@openreview review` | Trigger a fresh Fast mode review |
-| `@openreview rlm` | Trigger Deep/RLM mode review |
-| `@openreview <question>` | Ask a codebase-aware question |
-| `@openreview list learnings` | List stored learnings for this repo |
-| `@openreview forget: <description>` | Delete a stored learning |
+| Command                             | Description                         |
+| ----------------------------------- | ----------------------------------- |
+| `@openreview review`                | Trigger a fresh Fast mode review    |
+| `@openreview rlm`                   | Trigger Deep/RLM mode review        |
+| `@openreview <question>`            | Ask a codebase-aware question       |
+| `@openreview list learnings`        | List stored learnings for this repo |
+| `@openreview forget: <description>` | Delete a stored learning            |
 
 ## Configuration
 
@@ -83,18 +83,18 @@ cp .env.example .env
 
 Key settings:
 
-| Variable | Default | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `GEMINI_API_KEY` | — | Google Gemini API key |
-| `MAIN_MODEL` | `gpt-4o` | Primary model for review and chat |
-| `SUB_MODEL` | `gpt-4o-mini` | Secondary model for suggestions |
-| `MAX_FILES` | `100` | Max files per review |
-| `MAX_ITERATIONS` | `20` | Max RLM loop iterations |
-| `DEFAULT_REVIEW_MODE` | `fast` | Default mode: `fast` or `rlm` |
-| `INCLUDE_GLOBS` | — | File patterns to include |
-| `EXCLUDE_GLOBS` | — | File patterns to exclude |
+| Variable              | Default       | Description                       |
+| --------------------- | ------------- | --------------------------------- |
+| `OPENAI_API_KEY`      | —             | OpenAI API key                    |
+| `ANTHROPIC_API_KEY`   | —             | Anthropic API key                 |
+| `GEMINI_API_KEY`      | —             | Google Gemini API key             |
+| `MAIN_MODEL`          | `gpt-4o`      | Primary model for review and chat |
+| `SUB_MODEL`           | `gpt-4o-mini` | Secondary model for suggestions   |
+| `MAX_FILES`           | `100`         | Max files per review              |
+| `MAX_ITERATIONS`      | `20`          | Max RLM loop iterations           |
+| `DEFAULT_REVIEW_MODE` | `fast`        | Default mode: `fast` or `rlm`     |
+| `INCLUDE_GLOBS`       | —             | File patterns to include          |
+| `EXCLUDE_GLOBS`       | —             | File patterns to exclude          |
 
 See [`.env.example`](.env.example) for the full list.
 
@@ -105,6 +105,7 @@ See [`.env.example`](.env.example) for the full list.
 Single-shot structured LLM call over the full diff. Runs bundled linters in parallel. Completes in < 60 seconds.
 
 Findings are categorized:
+
 - **Bug — Severe** — requires immediate fix
 - **Bug — Non-severe** — should be reviewed
 - **Flag — Investigate** — warrants closer examination
@@ -130,15 +131,15 @@ Files at subdirectory level are scoped to code in that subtree.
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Core language | TypeScript / Node.js (≥ 20) |
-| LLM orchestration | LangGraph.js |
-| Package manager | pnpm |
-| Build tool | tsdown |
-| Testing | Vitest |
-| Linting | ESLint 10 + Prettier |
-| Sandbox | Deno (MVP) → Docker (Phase 2) |
+| Layer             | Technology                    |
+| ----------------- | ----------------------------- |
+| Core language     | TypeScript / Node.js (≥ 20)   |
+| LLM orchestration | LangGraph.js                  |
+| Package manager   | pnpm                          |
+| Build tool        | tsdown                        |
+| Testing           | Vitest                        |
+| Linting           | ESLint 10 + Prettier          |
+| Sandbox           | Deno (MVP) → Docker (Phase 2) |
 
 ## Development
 

@@ -74,7 +74,5 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
 
 /** Sort findings by severity (most critical first). */
 export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {
-  return [...findings].sort(
-    (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
-  );
+  return [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }

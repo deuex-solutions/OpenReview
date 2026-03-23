@@ -18,24 +18,24 @@
 
 ## Prerequisites
 
-| Requirement | Version | Notes |
-|---|---|---|
-| **Node.js** | >= 20 LTS | Node 22 or 24 recommended. Check with `node -v` |
-| **pnpm** | >= 10.x | Install: `npm install -g pnpm@latest` |
-| **Git** | >= 2.x | Required for repository operations |
-| **LLM API key** | — | At least one of: OpenAI, Anthropic, or Google Gemini |
+| Requirement     | Version   | Notes                                                |
+| --------------- | --------- | ---------------------------------------------------- |
+| **Node.js**     | >= 20 LTS | Node 22 or 24 recommended. Check with `node -v`      |
+| **pnpm**        | >= 10.x   | Install: `npm install -g pnpm@latest`                |
+| **Git**         | >= 2.x    | Required for repository operations                   |
+| **LLM API key** | —         | At least one of: OpenAI, Anthropic, or Google Gemini |
 
 ### Optional (for linter integrations)
 
 These are **not required** — if a linter is not installed, OpenReview skips it gracefully.
 
-| Tool | Install | What it catches |
-|---|---|---|
-| ESLint | Bundled via `npx` (no install needed) | JS/TS syntax errors, bad patterns |
-| [Ruff](https://docs.astral.sh/ruff/installation/) | `pip install ruff` or `brew install ruff` | Python linting (replaces Flake8/Pylint) |
-| [Semgrep](https://semgrep.dev/docs/getting-started/) | `pip install semgrep` or `brew install semgrep` | Multi-language SAST security patterns |
-| [ShellCheck](https://www.shellcheck.net/) | `brew install shellcheck` or `apt install shellcheck` | Bash/shell script bugs |
-| [Gitleaks](https://github.com/gitleaks/gitleaks) | `brew install gitleaks` or download binary | Hardcoded secrets and API keys |
+| Tool                                                 | Install                                               | What it catches                         |
+| ---------------------------------------------------- | ----------------------------------------------------- | --------------------------------------- |
+| ESLint                                               | Bundled via `npx` (no install needed)                 | JS/TS syntax errors, bad patterns       |
+| [Ruff](https://docs.astral.sh/ruff/installation/)    | `pip install ruff` or `brew install ruff`             | Python linting (replaces Flake8/Pylint) |
+| [Semgrep](https://semgrep.dev/docs/getting-started/) | `pip install semgrep` or `brew install semgrep`       | Multi-language SAST security patterns   |
+| [ShellCheck](https://www.shellcheck.net/)            | `brew install shellcheck` or `apt install shellcheck` | Bash/shell script bugs                  |
+| [Gitleaks](https://github.com/gitleaks/gitleaks)     | `brew install gitleaks` or download binary            | Hardcoded secrets and API keys          |
 
 ---
 
@@ -127,13 +127,13 @@ jobs:
 
 Once the Action is installed, you can use these commands in any PR comment:
 
-| Command | Action |
-|---|---|
-| *(automatic)* | Fast mode review runs on every PR open/update |
-| `@openreview rlm` | Trigger deep RLM agentic review |
-| `@openreview <question>` | Ask a codebase-aware question |
-| `@openreview list learnings` | Show what the bot has learned |
-| `@openreview forget: <description>` | Delete a specific learning |
+| Command                             | Action                                        |
+| ----------------------------------- | --------------------------------------------- |
+| _(automatic)_                       | Fast mode review runs on every PR open/update |
+| `@openreview rlm`                   | Trigger deep RLM agentic review               |
+| `@openreview <question>`            | Ask a codebase-aware question                 |
+| `@openreview list learnings`        | Show what the bot has learned                 |
+| `@openreview forget: <description>` | Delete a specific learning                    |
 
 ---
 
@@ -143,16 +143,17 @@ All settings are configured via `.env`. Copy `.env.example` to get started.
 
 ### LLM Settings
 
-| Variable | Default | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `GEMINI_API_KEY` | — | Google Gemini API key |
-| `MAIN_MODEL` | `gpt-4o` | Primary model for review and chat |
-| `SUB_MODEL` | `gpt-4o-mini` | Secondary model for summaries and suggestions |
-| `OPENAI_BASE_URL` | — | Custom OpenAI-compatible endpoint URL |
+| Variable            | Default       | Description                                   |
+| ------------------- | ------------- | --------------------------------------------- |
+| `OPENAI_API_KEY`    | —             | OpenAI API key                                |
+| `ANTHROPIC_API_KEY` | —             | Anthropic API key                             |
+| `GEMINI_API_KEY`    | —             | Google Gemini API key                         |
+| `MAIN_MODEL`        | `gpt-4o`      | Primary model for review and chat             |
+| `SUB_MODEL`         | `gpt-4o-mini` | Secondary model for summaries and suggestions |
+| `OPENAI_BASE_URL`   | —             | Custom OpenAI-compatible endpoint URL         |
 
 **Supported model prefixes:**
+
 - `gpt-*`, `o1*`, `o3*` → routes to OpenAI
 - `claude-*` → routes to Anthropic
 - `gemini-*` → routes to Google Gemini
@@ -160,44 +161,44 @@ All settings are configured via `.env`. Copy `.env.example` to get started.
 
 ### Review Limits
 
-| Variable | Default | Description |
-|---|---|---|
-| `MAX_ITERATIONS` | `20` | Max RLM loop iterations |
-| `MAX_LLM_CALLS` | `25` | Max total LLM calls per RLM session |
-| `MAX_FILES` | `100` | Max files per review |
-| `MAX_FILE_BYTES` | `200000` | Max bytes per individual file |
-| `MAX_TOTAL_BYTES` | `5000000` | Max total snapshot size |
+| Variable          | Default   | Description                         |
+| ----------------- | --------- | ----------------------------------- |
+| `MAX_ITERATIONS`  | `20`      | Max RLM loop iterations             |
+| `MAX_LLM_CALLS`   | `25`      | Max total LLM calls per RLM session |
+| `MAX_FILES`       | `100`     | Max files per review                |
+| `MAX_FILE_BYTES`  | `200000`  | Max bytes per individual file       |
+| `MAX_TOTAL_BYTES` | `5000000` | Max total snapshot size             |
 
 ### File Filtering
 
-| Variable | Default | Description |
-|---|---|---|
-| `INCLUDE_GLOBS` | *(empty — include all)* | Comma-separated globs to include (e.g., `src/**/*.ts,src/**/*.py`) |
-| `EXCLUDE_GLOBS` | *(empty — exclude none)* | Comma-separated globs to exclude (e.g., `dist/**,*.lock,*.min.js`) |
+| Variable        | Default                  | Description                                                        |
+| --------------- | ------------------------ | ------------------------------------------------------------------ |
+| `INCLUDE_GLOBS` | _(empty — include all)_  | Comma-separated globs to include (e.g., `src/**/*.ts,src/**/*.py`) |
+| `EXCLUDE_GLOBS` | _(empty — exclude none)_ | Comma-separated globs to exclude (e.g., `dist/**,*.lock,*.min.js`) |
 
 ### Linter Toggles
 
-| Variable | Default | Description |
-|---|---|---|
-| `LINTER_ESLINT` | `true` | Enable ESLint for JS/TS files |
-| `LINTER_RUFF` | `true` | Enable Ruff for Python files |
-| `LINTER_SEMGREP` | `true` | Enable Semgrep for security scanning |
-| `LINTER_SHELLCHECK` | `true` | Enable ShellCheck for shell scripts |
-| `LINTER_GITLEAKS` | `true` | Enable Gitleaks for secret detection |
+| Variable            | Default | Description                          |
+| ------------------- | ------- | ------------------------------------ |
+| `LINTER_ESLINT`     | `true`  | Enable ESLint for JS/TS files        |
+| `LINTER_RUFF`       | `true`  | Enable Ruff for Python files         |
+| `LINTER_SEMGREP`    | `true`  | Enable Semgrep for security scanning |
+| `LINTER_SHELLCHECK` | `true`  | Enable ShellCheck for shell scripts  |
+| `LINTER_GITLEAKS`   | `true`  | Enable Gitleaks for secret detection |
 
 ### Review Behavior
 
-| Variable | Default | Description |
-|---|---|---|
-| `REVIEW_DRAFTS` | `false` | Whether to review draft PRs |
-| `MOVE_DETECTION_THRESHOLD` | `0.8` | Similarity threshold for copy/move detection (0.0–1.0) |
-| `DEFAULT_REVIEW_MODE` | `fast` | Default review mode: `fast` or `rlm` |
+| Variable                   | Default | Description                                            |
+| -------------------------- | ------- | ------------------------------------------------------ |
+| `REVIEW_DRAFTS`            | `false` | Whether to review draft PRs                            |
+| `MOVE_DETECTION_THRESHOLD` | `0.8`   | Similarity threshold for copy/move detection (0.0–1.0) |
+| `DEFAULT_REVIEW_MODE`      | `fast`  | Default review mode: `fast` or `rlm`                   |
 
 ### Storage
 
-| Variable | Default | Description |
-|---|---|---|
-| `GITHUB_PAT` | — | GitHub Personal Access Token (CLI mode) |
+| Variable          | Default         | Description                                 |
+| ----------------- | --------------- | ------------------------------------------- |
+| `GITHUB_PAT`      | —               | GitHub Personal Access Token (CLI mode)     |
 | `OPENREVIEW_HOME` | `~/.openreview` | Base directory for learnings and trace logs |
 
 ---
@@ -304,13 +305,13 @@ openreview/
 
 Create any of these files in your repository to provide project-specific review rules:
 
-| File | Scope |
-|---|---|
-| `REVIEW.md` | Highest priority — your team's review standards |
-| `AGENTS.md` | Agent-specific instructions |
-| `CLAUDE.md` | Claude Code instructions (also read by OpenReview) |
-| `.cursorrules` | Cursor IDE rules (also read by OpenReview) |
-| `.windsurfrules` | Windsurf IDE rules (also read by OpenReview) |
+| File             | Scope                                              |
+| ---------------- | -------------------------------------------------- |
+| `REVIEW.md`      | Highest priority — your team's review standards    |
+| `AGENTS.md`      | Agent-specific instructions                        |
+| `CLAUDE.md`      | Claude Code instructions (also read by OpenReview) |
+| `.cursorrules`   | Cursor IDE rules (also read by OpenReview)         |
+| `.windsurfrules` | Windsurf IDE rules (also read by OpenReview)       |
 
 Files at the repository root apply **globally**. Files in subdirectories apply only to code in that subtree. Total instruction content is capped at ~10,000 tokens.
 
@@ -354,4 +355,4 @@ pnpm build
 
 ---
 
-*OpenReview — MIT Licensed — [github.com/openreview](https://github.com/openreview)*
+_OpenReview — MIT Licensed — [github.com/openreview](https://github.com/openreview)_
