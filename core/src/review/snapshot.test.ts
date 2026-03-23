@@ -224,4 +224,28 @@ describe('SnapshotBuilder', () => {
       expect(snap.getTotalBytes()).toBe(11);
     });
   });
+
+  describe('concurrent access', () => {
+    it('does not double-fetch when getFile is called concurrently for the same path', async () => {
+      client = createMockClient({ 'src/index.ts': 'const x = 1;' });
+      const snap = new SnapshotBuilder({
+        client,
+        headRef: 'abc123',
+        diffs: [makeDiff('src/index.ts')],
+      });
+
+      // Call getFile concurrently for the same path
+      const [result1, result2] = await Promise.all([
+        snap.getFile('src/index.ts'),
+        snap.getFile('src/index.ts'),
+      ]);
+
+      expect(result1).toBe('const x = 1;');
+      expect(result2).toBe('const x = 1;');
+      // Should only fetch once despite concurrent calls
+      expect(client.getFileContent).toHaveBeenCalledTimes(1);
+      // Should not double-count bytes
+      expect(snap.getTotalBytes()).toBe(Buffer.byteLength('const x = 1;', 'utf-8'));
+    });
+  });
 });

@@ -143,6 +143,36 @@ describe('GitHubClient', () => {
     });
   });
 
+  describe('getIssueComments', () => {
+    it('returns normalized comments filtering out deleted users', async () => {
+      mockApi.get.mockResolvedValue({
+        data: [
+          { id: 1, user: { login: 'alice' }, body: 'Looks good' },
+          { id: 2, user: null, body: 'Ghost comment' },
+          { id: 3, user: { login: 'bob' }, body: null },
+        ],
+      });
+
+      const comments = await client.getIssueComments(42);
+      // Should filter out the null-user comment
+      expect(comments).toHaveLength(2);
+      expect(comments[0]).toEqual({ id: 1, user: { login: 'alice' }, body: 'Looks good' });
+      // Should normalize null body to empty string
+      expect(comments[1]).toEqual({ id: 3, user: { login: 'bob' }, body: '' });
+      expect(mockApi.get).toHaveBeenCalledWith('/repos/acme/widget/issues/42/comments', {
+        params: { per_page: 50 },
+      });
+    });
+
+    it('passes custom perPage parameter', async () => {
+      mockApi.get.mockResolvedValue({ data: [] });
+      await client.getIssueComments(10, 25);
+      expect(mockApi.get).toHaveBeenCalledWith('/repos/acme/widget/issues/10/comments', {
+        params: { per_page: 25 },
+      });
+    });
+  });
+
   describe('getFileTree', () => {
     it('returns blob paths from recursive tree', async () => {
       mockApi.get.mockResolvedValue({

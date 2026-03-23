@@ -60,6 +60,9 @@ export async function handleChatMention(event: CommentEvent, ctx: ChatContext): 
     answer += chunk;
   }
 
+  // Don't post empty replies
+  if (!answer.trim()) return;
+
   // Validate citations in the response
   answer = await validateAnswerCitations(answer, ctx.snapshot);
 

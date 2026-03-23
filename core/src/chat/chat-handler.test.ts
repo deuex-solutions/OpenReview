@@ -203,4 +203,21 @@ describe('handleChatMention', () => {
 
     expect(client.getIssueComments).toHaveBeenCalledWith(42);
   });
+
+  it('does not post empty reply when LLM returns no chunks', async () => {
+    streamChunks = []; // LLM yields nothing
+
+    const { handleChatMention } = await import('./chat-handler.js');
+
+    const event: CommentEvent = {
+      commentId: 123,
+      body: '@openreview explain this',
+      user: 'developer1',
+      prNumber: 42,
+    };
+
+    await handleChatMention(event, createChatContext());
+
+    expect(postedReplies).toHaveLength(0);
+  });
 });

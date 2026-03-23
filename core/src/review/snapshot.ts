@@ -32,6 +32,9 @@ export class SnapshotBuilder {
   /** In-memory file cache: path → content (empty string for binary files). */
   private readonly cache = new Map<string, string>();
 
+  /** In-flight fetch promises to prevent duplicate concurrent fetches. */
+  private readonly inflight = new Map<string, Promise<string>>();
+
   /** Total bytes fetched so far (across all cached files). */
   private totalBytes = 0;
 
@@ -64,11 +67,28 @@ export class SnapshotBuilder {
       return cached;
     }
 
+    // If a fetch is already in-flight for this path, await it
+    const pending = this.inflight.get(path);
+    if (pending) {
+      return pending;
+    }
+
     // Check total byte budget before fetching
     if (this.totalBytes >= this.maxTotalBytes) {
       return '';
     }
 
+    const fetchPromise = this.fetchFile(path);
+    this.inflight.set(path, fetchPromise);
+
+    try {
+      return await fetchPromise;
+    } finally {
+      this.inflight.delete(path);
+    }
+  }
+
+  private async fetchFile(path: string): Promise<string> {
     try {
       const content = await this.client.getFileContent(path, this.headRef);
 

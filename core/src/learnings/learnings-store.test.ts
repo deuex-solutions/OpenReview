@@ -116,7 +116,7 @@ describe('LearningsStore', () => {
     expect(all.find((l) => l.finding === 'new-finding')).toBeDefined(); // New one added
   });
 
-  it('loads existing learnings from file', () => {
+  it('loads existing learnings from file', async () => {
     const existing: Learning[] = [
       {
         id: 'test-id',
@@ -130,10 +130,9 @@ describe('LearningsStore', () => {
     mockReadFileSync.mockReturnValue(JSON.stringify(existing));
 
     const store = new LearningsStore('org/repo');
-    store.list().then((all) => {
-      expect(all).toHaveLength(1);
-      expect(all[0].id).toBe('test-id');
-    });
+    const all = await store.list();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe('test-id');
   });
 });
 

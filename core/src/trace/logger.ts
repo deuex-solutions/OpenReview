@@ -149,7 +149,12 @@ export class TraceLogger {
     };
 
     const json = scrubSecrets(JSON.stringify(trace, null, 2));
-    writeFileSync(this.filePath, json, 'utf-8');
+    try {
+      writeFileSync(this.filePath, json, 'utf-8');
+    } catch {
+      // Trace writing is best-effort — don't crash the review if disk is
+      // full, path is invalid, or permissions are wrong.
+    }
   }
 
   /** Get the trace file path. */

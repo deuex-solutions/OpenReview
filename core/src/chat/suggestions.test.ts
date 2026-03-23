@@ -14,10 +14,16 @@ vi.mock('../config/env.js', () => ({
 }));
 
 let llmResponse = '';
+let llmShouldThrow = false;
 
 vi.mock('../llm/router.js', () => ({
   createSubLLM: () => ({
-    invoke: vi.fn(async () => ({ content: llmResponse })),
+    invoke: vi.fn(async () => {
+      if (llmShouldThrow) {
+        throw new Error('API error');
+      }
+      return { content: llmResponse };
+    }),
   }),
 }));
 
@@ -52,6 +58,7 @@ describe('generateSuggestions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     llmResponse = '';
+    llmShouldThrow = false;
   });
 
   it('returns parsed suggestions from LLM response', async () => {
@@ -107,18 +114,9 @@ describe('generateSuggestions', () => {
   });
 
   it('returns empty array on LLM error', async () => {
-    vi.doMock('../llm/router.js', () => ({
-      createSubLLM: () => ({
-        invoke: vi.fn(async () => {
-          throw new Error('API error');
-        }),
-      }),
-    }));
+    llmShouldThrow = true;
 
-    // Re-import with error mock
     const { generateSuggestions } = await import('./suggestions.js');
-    // Since the module is cached, we test with empty response instead
-    llmResponse = '';
     const suggestions = await generateSuggestions('Some answer.', createMockPR());
     expect(suggestions).toEqual([]);
   });

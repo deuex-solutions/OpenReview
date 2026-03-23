@@ -210,7 +210,15 @@ export class GitHubClient {
       `/repos/${this.owner}/${this.repo}/issues/${prNumber}/comments`,
       { params: { per_page: perPage } },
     );
-    return data;
+
+    // Normalize: guard against deleted users (null user) and null bodies
+    return (data as Array<{ id: number; user?: { login: string } | null; body?: string | null }>)
+      .filter((c) => c.user != null)
+      .map((c) => ({
+        id: c.id,
+        user: { login: c.user!.login },
+        body: c.body ?? '',
+      }));
   }
 
   /* ---- File tree at ref ---- */

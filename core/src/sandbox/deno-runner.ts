@@ -132,14 +132,15 @@ export async function executeSandboxed(
           return;
         }
 
-        const exitCode = error
-          ? ((error as NodeJS.ErrnoException & { code?: number }).code ?? 1)
-          : 0;
+        // Node's ExecException sets `code` to a number (the exit code) for
+        // process exits, and a string (e.g. 'ENOENT') for system errors.
+        const rawCode = error ? (error as { code?: string | number }).code : 0;
+        const exitCode = typeof rawCode === 'number' ? rawCode : 1;
 
         resolve({
           stdout: typeof stdout === 'string' ? stdout : '',
           stderr: typeof stderr === 'string' ? stderr : '',
-          exitCode: typeof exitCode === 'number' ? exitCode : 1,
+          exitCode,
           duration,
         });
       },
