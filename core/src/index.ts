@@ -32,6 +32,10 @@ export type {
   FindingSource,
 } from './review/types.js';
 
+// Trace
+export { TraceLogger } from './trace/logger.js';
+export type { TraceEntry, TraceMeta } from './trace/logger.js';
+
 // Sandbox
 export { executeSandboxed, verifyDenoInstallation } from './sandbox/deno-runner.js';
 export type { SandboxResult } from './sandbox/deno-runner.js';
