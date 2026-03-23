@@ -35,12 +35,12 @@ vi.mock('../llm/router.js', () => ({
   }),
 }));
 
-let postedReplies: Array<{ commentId: number; body: string }> = [];
+let postedReplies: Array<{ prNumber: number; body: string }> = [];
 
 vi.mock('../github/comments.js', () => ({
   CommentPoster: class {
-    async postChatReply(commentId: number, body: string) {
-      postedReplies.push({ commentId, body });
+    async postChatReply(prNumber: number, body: string) {
+      postedReplies.push({ prNumber, body });
     }
   },
 }));
@@ -76,10 +76,7 @@ function createMockClient(): GitHubClient {
   return {
     owner: 'test-org',
     repo: 'test-repo',
-    api: {
-      get: vi.fn(async () => ({ data: [] })),
-      post: vi.fn(async () => ({})),
-    },
+    getIssueComments: vi.fn(async () => []),
   } as unknown as GitHubClient;
 }
 
@@ -112,7 +109,7 @@ describe('handleChatMention', () => {
     streamChunks = ['This is ', 'a test ', 'answer.'];
   });
 
-  it('extracts question and posts a reply', async () => {
+  it('extracts question and posts a reply using prNumber', async () => {
     const { handleChatMention } = await import('./chat-handler.js');
 
     const event: CommentEvent = {
@@ -125,7 +122,7 @@ describe('handleChatMention', () => {
     await handleChatMention(event, createChatContext());
 
     expect(postedReplies).toHaveLength(1);
-    expect(postedReplies[0].commentId).toBe(123);
+    expect(postedReplies[0].prNumber).toBe(42);
     expect(postedReplies[0].body).toContain('This is a test answer.');
   });
 
@@ -188,7 +185,22 @@ describe('handleChatMention', () => {
 
     await handleChatMention(event, createChatContext());
 
-    // Empty question after stripping mention — should do nothing
     expect(postedReplies).toHaveLength(0);
+  });
+
+  it('loads thread history via public getIssueComments method', async () => {
+    const { handleChatMention } = await import('./chat-handler.js');
+    const client = createMockClient();
+
+    const event: CommentEvent = {
+      commentId: 123,
+      body: '@openreview question?',
+      user: 'developer1',
+      prNumber: 42,
+    };
+
+    await handleChatMention(event, createChatContext({ client }));
+
+    expect(client.getIssueComments).toHaveBeenCalledWith(42);
   });
 });

@@ -36,10 +36,7 @@ const BOT_DEFAULT = 'openreview[bot]';
  * Extracts the question, builds context, calls LLM, validates citations,
  * and posts the answer as a reply comment with follow-up suggestions.
  */
-export async function handleChatMention(
-  event: CommentEvent,
-  ctx: ChatContext,
-): Promise<void> {
+export async function handleChatMention(event: CommentEvent, ctx: ChatContext): Promise<void> {
   // Detect bot's own comments to prevent reply loops
   const botName = ctx.botUsername ?? BOT_DEFAULT;
   if (event.user.toLowerCase() === botName.toLowerCase()) {
@@ -51,7 +48,7 @@ export async function handleChatMention(
   if (!question) return;
 
   // Load conversation thread history
-  const threadHistory = await loadThreadHistory(ctx.client, ctx.pr, event.prNumber);
+  const threadHistory = await loadThreadHistory(ctx.client, event.prNumber);
 
   // Build chat context with snapshot tools
   const messages = buildChatMessages(question, threadHistory, ctx.pr, ctx.snapshot);
@@ -75,9 +72,9 @@ export async function handleChatMention(
     answer += suggestions.map((s) => `> - ${s}`).join('\n');
   }
 
-  // Post reply
+  // Post reply as a new comment on the PR
   const poster = new CommentPoster(ctx.client);
-  await poster.postChatReply(event.commentId, answer);
+  await poster.postChatReply(event.prNumber, answer);
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,16 +88,11 @@ function extractQuestion(body: string): string | null {
 
 async function loadThreadHistory(
   client: GitHubClient,
-  _pr: PRContext,
   prNumber: number,
 ): Promise<Array<{ user: string; body: string }>> {
   try {
-    const response = await client['api'].get(
-      `/repos/${client.owner}/${client.repo}/issues/${prNumber}/comments`,
-      { params: { per_page: 50 } },
-    );
-
-    return (response.data as Array<{ user: { login: string }; body: string }>).map((c) => ({
+    const comments = await client.getIssueComments(prNumber);
+    return comments.map((c) => ({
       user: c.user.login,
       body: c.body,
     }));
@@ -153,10 +145,7 @@ function buildChatMessages(
   return messages;
 }
 
-async function validateAnswerCitations(
-  answer: string,
-  snapshot: SnapshotBuilder,
-): Promise<string> {
+async function validateAnswerCitations(answer: string, snapshot: SnapshotBuilder): Promise<string> {
   // Extract file references like `path/to/file.ts:10`
   const fileRefRe = /`([a-zA-Z0-9_/.@-]+\.[a-zA-Z0-9]+)(?::(\d+))?`/g;
   const referencedFiles = new Set<string>();

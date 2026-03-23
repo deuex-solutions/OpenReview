@@ -20,10 +20,7 @@ vi.mock('../config/env.js', () => ({
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function createMockClient(
-  files: Record<string, string> = {},
-  tree: string[] = [],
-): GitHubClient {
+function createMockClient(files: Record<string, string> = {}, tree: string[] = []): GitHubClient {
   return {
     getFileContent: vi.fn(async (path: string) => {
       if (path in files) return files[path];
@@ -33,15 +30,14 @@ function createMockClient(
   } as unknown as GitHubClient;
 }
 
-function makeDiff(newPath: string): ParsedDiff {
+function makeDiff(filePath: string): ParsedDiff {
   return {
-    oldPath: newPath,
-    newPath,
+    file: filePath,
     status: 'modified',
     hunks: [],
-    additions: 0,
-    deletions: 0,
-  } as unknown as ParsedDiff;
+    addedLines: [],
+    deletedLines: [],
+  };
 }
 
 /* ------------------------------------------------------------------ */

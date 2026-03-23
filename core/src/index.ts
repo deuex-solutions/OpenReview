@@ -33,7 +33,11 @@ export type {
 } from './review/types.js';
 
 // Learnings
-export { LearningsStore, containsTrigger, formatLearningsForPrompt } from './learnings/learnings-store.js';
+export {
+  LearningsStore,
+  containsTrigger,
+  formatLearningsForPrompt,
+} from './learnings/learnings-store.js';
 export type { Learning } from './learnings/learnings-store.js';
 
 // Chat
@@ -50,5 +54,11 @@ export { executeSandboxed, verifyDenoInstallation } from './sandbox/deno-runner.
 export type { SandboxResult } from './sandbox/deno-runner.js';
 
 // LLM
-export { createLLM, createMainLLM, createSubLLM, detectProvider, streamChat } from './llm/router.js';
+export {
+  createLLM,
+  createMainLLM,
+  createSubLLM,
+  detectProvider,
+  streamChat,
+} from './llm/router.js';
 export type { LLMProvider, LLMInfo } from './llm/router.js';

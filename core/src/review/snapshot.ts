@@ -46,8 +46,8 @@ export class SnapshotBuilder {
 
     // Pre-load diff file paths into cache keys (content loaded lazily)
     for (const diff of options.diffs) {
-      if (diff.newPath && !this.cache.has(diff.newPath)) {
-        this.cache.set(diff.newPath, '');
+      if (diff.file && !this.cache.has(diff.file)) {
+        this.cache.set(diff.file, '');
       }
     }
   }

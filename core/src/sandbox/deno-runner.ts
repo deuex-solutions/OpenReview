@@ -96,7 +96,16 @@ export async function executeSandboxed(
 
     execFile(
       'deno',
-      ['eval', '--ext=ts', script],
+      [
+        'eval',
+        '--ext=ts',
+        '--allow-read',
+        '--deny-net',
+        '--deny-write',
+        '--deny-env',
+        '--deny-run',
+        script,
+      ],
       {
         signal: controller.signal,
         timeout: timeoutMs + 1_000, // extra buffer for OS-level timeout
@@ -123,7 +132,9 @@ export async function executeSandboxed(
           return;
         }
 
-        const exitCode = error ? (error as NodeJS.ErrnoException & { code?: number }).code ?? 1 : 0;
+        const exitCode = error
+          ? ((error as NodeJS.ErrnoException & { code?: number }).code ?? 1)
+          : 0;
 
         resolve({
           stdout: typeof stdout === 'string' ? stdout : '',
