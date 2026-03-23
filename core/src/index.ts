@@ -28,6 +28,10 @@ export type {
   FindingSource,
 } from './review/types.js';
 
+// Sandbox
+export { executeSandboxed, verifyDenoInstallation } from './sandbox/deno-runner.js';
+export type { SandboxResult } from './sandbox/deno-runner.js';
+
 // LLM
 export { createLLM, createMainLLM, createSubLLM, detectProvider, streamChat } from './llm/router.js';
 export type { LLMProvider, LLMInfo } from './llm/router.js';
