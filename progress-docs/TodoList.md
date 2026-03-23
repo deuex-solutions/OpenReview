@@ -134,31 +134,31 @@
 ## 5. Fast Mode Review
 
 ### 5.1 Linter Orchestration (`core/src/review/linters.ts`)
-- [ ] Implement `runLinters(files: string[], repoPath: string): Promise<ReviewFinding[]>`
-- [ ] For each enabled linter, spawn child process with 30-second timeout
-- [ ] Run all linters in parallel (`Promise.allSettled`)
-- [ ] **ESLint**: `npx eslint --format json <files>` — parse JSON output into findings
-- [ ] **Ruff**: `ruff check --output-format json <files>` — parse JSON output
-- [ ] **Semgrep**: `semgrep --json <files>` — parse JSON output
-- [ ] **ShellCheck**: `shellcheck --format=json <files>` — parse JSON output
-- [ ] **Gitleaks**: `gitleaks detect --source . --report-format json` — parse JSON output
-- [ ] If linter binary not found: skip with `console.warn`, not fatal error
-- [ ] Map linter output fields to `ReviewFinding` interface
-- [ ] Deduplicate against AI findings: same file + same line range = merge into `source: 'both'`
-- [ ] Unit test: each linter parser with sample output fixtures, timeout handling, binary-not-found handling
+- [x] Implement `runLinters(files: string[], repoPath: string): Promise<ReviewFinding[]>`
+- [x] For each enabled linter, spawn child process with 30-second timeout
+- [x] Run all linters in parallel (`Promise.allSettled`)
+- [x] **ESLint**: `npx eslint --format json <files>` — parse JSON output into findings
+- [x] **Ruff**: `ruff check --output-format json <files>` — parse JSON output
+- [x] **Semgrep**: `semgrep --json <files>` — parse JSON output
+- [x] **ShellCheck**: `shellcheck --format=json <files>` — parse JSON output
+- [x] **Gitleaks**: `gitleaks detect --source . --report-format json` — parse JSON output
+- [x] If linter binary not found: skip with `console.warn`, not fatal error
+- [x] Map linter output fields to `ReviewFinding` interface
+- [x] Deduplicate against AI findings: same file + same line range = merge into `source: 'both'`
+- [x] Unit test: each linter parser with sample output fixtures, timeout handling, binary-not-found handling
 
 ### 5.2 Fast Review Engine (`core/src/review/fast-review.ts`)
-- [ ] Implement `runFastReview(pr: PRContext): Promise<ReviewFinding[]>`
-- [ ] Build structured prompt:
+- [x] Implement `runFastReview(pr: PRContext): Promise<ReviewFinding[]>`
+- [x] Build structured prompt:
   - System: role + instruction file content
   - Human: PR metadata + full diff + linter findings
   - Request: JSON array of findings with schema
-- [ ] Call `createMainLLM()` with structured output (JSON mode / function calling)
-- [ ] Parse LLM response into `ReviewFinding[]`
-- [ ] Validate citations: only cite lines visible in the diff (reject hallucinated line numbers)
-- [ ] Merge with linter findings (deduplication)
-- [ ] Return sorted findings: Severe first, then Non-severe, Investigate, Informational
-- [ ] Unit test: prompt construction, citation validation, finding sort order, JSON parse error handling
+- [x] Call `createMainLLM()` with structured output (JSON mode / function calling)
+- [x] Parse LLM response into `ReviewFinding[]`
+- [x] Validate citations: only cite lines visible in the diff (reject hallucinated line numbers)
+- [x] Merge with linter findings (deduplication)
+- [x] Return sorted findings: Severe first, then Non-severe, Investigate, Informational
+- [x] Unit test: prompt construction, citation validation, finding sort order, JSON parse error handling
 
 ---
 

@@ -50,18 +50,16 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 - ✅ LangGraph.js setup and model router (OpenAI / Anthropic / Gemini provider switching)
 - 65 tests passing, lint clean, typecheck clean, all 3 packages building
 
-#### Week 2 — Fast Mode + Linters
-- `core/review/fast-review.ts` — Single-shot structured LLM review
-- Finding categorization (Severe Bug / Non-severe Bug / Investigate / Informational)
-- `core/review/linters.ts` — Parallel linter orchestration
-  - ESLint integration
-  - Ruff integration
-  - Semgrep integration
-  - ShellCheck integration
-  - Gitleaks integration
-- Finding deduplication (linter + AI overlap by file + line)
-- Summary comment formatter (severity breakdown table)
-- Fix suggestion formatting (inline comment, no auto-commit)
+#### Week 2 — Fast Mode + Linters ✅ COMPLETE (2026-03-20)
+- ✅ `core/review/types.ts` — Full data model (ReviewFinding, Citation, ReviewSummary, PRContext, severity/category/source types)
+- ✅ `core/review/fast-review.ts` — Single-shot structured LLM review with citation validation against diff
+- ✅ `core/review/linters.ts` — Parallel linter orchestration (Promise.allSettled, 30s timeout, binary-not-found skip)
+  - ✅ ESLint, Ruff, Semgrep, ShellCheck, Gitleaks — individual JSON parsers
+- ✅ `core/review/formatter.ts` — Summary comment (severity table, trigger hints, HTML marker) + inline comment (badges, attribution, GitHub suggestion syntax)
+- ✅ Finding deduplication (linter + AI overlap by file + line range → source: 'both')
+- ✅ LLM response parsing with robust JSON extraction (code fences, embedded arrays, fallback)
+- ✅ `comments.ts` migrated to canonical review types (single source of truth)
+- 94 tests passing, lint clean, typecheck clean, all 3 packages building
 
 #### Week 3 — RLM Mode + Chat + Learnings
 - `core/sandbox/deno-runner.ts` — Deno sandbox executor (read-only)

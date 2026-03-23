@@ -11,8 +11,22 @@ export { GitHubClient, parsePRUrl } from './github/client.js';
 export type { PRMetadata, PRFile, GitHubClientOptions } from './github/client.js';
 export { parseDiff, detectMovesAndCopies, filterDiffs } from './github/diff.js';
 export type { ParsedDiff, Hunk, Line, MoveEvent } from './github/diff.js';
-export { CommentPoster, formatInlineComment, formatSummaryComment } from './github/comments.js';
-export type { ReviewFinding, ReviewSummary, Severity } from './github/comments.js';
+export { CommentPoster } from './github/comments.js';
+
+// Review
+export { runFastReview } from './review/fast-review.js';
+export { runLinters, deduplicateFindings } from './review/linters.js';
+export { formatInlineComment, formatSummaryComment } from './review/formatter.js';
+export { sortFindings } from './review/types.js';
+export type {
+  ReviewFinding,
+  ReviewSummary,
+  PRContext,
+  Citation,
+  FindingCategory,
+  FindingSeverity,
+  FindingSource,
+} from './review/types.js';
 
 // LLM
 export { createLLM, createMainLLM, createSubLLM, detectProvider, streamChat } from './llm/router.js';
