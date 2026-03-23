@@ -32,6 +32,11 @@ export type {
   FindingSource,
 } from './review/types.js';
 
+// Chat
+export { handleChatMention } from './chat/chat-handler.js';
+export type { CommentEvent, ChatContext } from './chat/chat-handler.js';
+export { generateSuggestions } from './chat/suggestions.js';
+
 // Trace
 export { TraceLogger } from './trace/logger.js';
 export type { TraceEntry, TraceMeta } from './trace/logger.js';
