@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ReviewFinding, ReviewSummary } from '../review/types.js';
+import type { GitHubClient } from '../../../core/src/github/client.js';
+import { CommentPoster } from '../../../core/src/github/comments.js';
+import type { ReviewFinding, ReviewSummary } from '../../../core/src/review/types.js';
 
-import type { GitHubClient } from './client.js';
-import { CommentPoster } from './comments.js';
-
-vi.mock('../review/formatter.js', () => ({
+vi.mock('../../../core/src/review/formatter.js', () => ({
   formatInlineComment: vi.fn((f: ReviewFinding) => `inline:${f.id}`),
   formatSummaryComment: vi.fn(
     (s: ReviewSummary) => `<!-- openreview-summary -->\nsummary:${s.totalFindings}`,

@@ -2,15 +2,14 @@ import { writeFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ReviewFinding } from '../review/types.js';
-
-import { TraceLogger } from './logger.js';
+import type { ReviewFinding } from '../../../core/src/review/types.js';
+import { TraceLogger } from '../../../core/src/trace/logger.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     openreviewHome: '/tmp/openreview-test',
   },

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PRContext } from '../review/types.js';
+import type { PRContext } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     subModel: 'gpt-4o-mini',
     openaiApiKey: 'test-key',
@@ -16,7 +16,7 @@ vi.mock('../config/env.js', () => ({
 let llmResponse = '';
 let llmShouldThrow = false;
 
-vi.mock('../llm/router.js', () => ({
+vi.mock('../../../core/src/llm/router.js', () => ({
   createSubLLM: () => ({
     invoke: vi.fn(async () => {
       if (llmShouldThrow) {
@@ -65,7 +65,7 @@ describe('generateSuggestions', () => {
     llmResponse =
       'How does this affect performance?\nAny edge cases to consider?\nWhat about testing?\nShould we add logging?';
 
-    const { generateSuggestions } = await import('./suggestions.js');
+    const { generateSuggestions } = await import('../../../core/src/chat/suggestions.js');
     const suggestions = await generateSuggestions('The code looks fine.', createMockPR());
 
     expect(suggestions.length).toBeGreaterThanOrEqual(1);
@@ -79,7 +79,7 @@ describe('generateSuggestions', () => {
     llmResponse =
       'Short question here?\nThis is a very long question that exceeds the eight word limit significantly\nAnother short one?';
 
-    const { generateSuggestions } = await import('./suggestions.js');
+    const { generateSuggestions } = await import('../../../core/src/chat/suggestions.js');
     const suggestions = await generateSuggestions('Some answer.', createMockPR());
 
     suggestions.forEach((s) => {
@@ -88,7 +88,7 @@ describe('generateSuggestions', () => {
   });
 
   it('returns empty array for empty answer', async () => {
-    const { generateSuggestions } = await import('./suggestions.js');
+    const { generateSuggestions } = await import('../../../core/src/chat/suggestions.js');
     const suggestions = await generateSuggestions('', createMockPR());
     expect(suggestions).toEqual([]);
   });
@@ -96,7 +96,7 @@ describe('generateSuggestions', () => {
   it('returns at most 5 suggestions', async () => {
     llmResponse = 'Q1?\nQ2?\nQ3?\nQ4?\nQ5?\nQ6?\nQ7?';
 
-    const { generateSuggestions } = await import('./suggestions.js');
+    const { generateSuggestions } = await import('../../../core/src/chat/suggestions.js');
     const suggestions = await generateSuggestions('Some answer.', createMockPR());
     expect(suggestions.length).toBeLessThanOrEqual(5);
   });
@@ -104,7 +104,7 @@ describe('generateSuggestions', () => {
   it('strips numbering and bullet prefixes', async () => {
     llmResponse = '1. What about edge cases?\n2. Any performance concerns?\n- Should we add tests?';
 
-    const { generateSuggestions } = await import('./suggestions.js');
+    const { generateSuggestions } = await import('../../../core/src/chat/suggestions.js');
     const suggestions = await generateSuggestions('Some answer.', createMockPR());
 
     suggestions.forEach((s) => {
@@ -116,7 +116,7 @@ describe('generateSuggestions', () => {
   it('returns empty array on LLM error', async () => {
     llmShouldThrow = true;
 
-    const { generateSuggestions } = await import('./suggestions.js');
+    const { generateSuggestions } = await import('../../../core/src/chat/suggestions.js');
     const suggestions = await generateSuggestions('Some answer.', createMockPR());
     expect(suggestions).toEqual([]);
   });

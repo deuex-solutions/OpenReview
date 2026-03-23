@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { detectProvider } from './router.js';
+import { detectProvider } from '../../../core/src/llm/router.js';
 
 /* ------------------------------------------------------------------ */
 /*  detectProvider                                                     */
@@ -69,7 +69,7 @@ vi.mock('@langchain/google-genai', () => {
   return { ChatGoogleGenerativeAI };
 });
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     mainModel: 'gpt-4o',
     subModel: 'claude-sonnet-4-20250514',
@@ -87,7 +87,7 @@ describe('createLLM', () => {
 
   it('creates ChatOpenAI for gpt models', async () => {
     const { ChatOpenAI } = await import('@langchain/openai');
-    const { createLLM } = await import('./router.js');
+    const { createLLM } = await import('../../../core/src/llm/router.js');
 
     createLLM('gpt-4o');
     expect(ChatOpenAI).toHaveBeenCalledWith(
@@ -97,7 +97,7 @@ describe('createLLM', () => {
 
   it('creates ChatAnthropic for claude models', async () => {
     const { ChatAnthropic } = await import('@langchain/anthropic');
-    const { createLLM } = await import('./router.js');
+    const { createLLM } = await import('../../../core/src/llm/router.js');
 
     createLLM('claude-3-opus-20240229');
     expect(ChatAnthropic).toHaveBeenCalledWith(
@@ -107,7 +107,7 @@ describe('createLLM', () => {
 
   it('creates ChatGoogleGenerativeAI for gemini models', async () => {
     const { ChatGoogleGenerativeAI } = await import('@langchain/google-genai');
-    const { createLLM } = await import('./router.js');
+    const { createLLM } = await import('../../../core/src/llm/router.js');
 
     createLLM('gemini-2.0-flash');
     expect(ChatGoogleGenerativeAI).toHaveBeenCalledWith(
@@ -116,11 +116,11 @@ describe('createLLM', () => {
   });
 
   it('passes custom baseURL for OpenAI when configured', async () => {
-    const { config } = await import('../config/env.js');
+    const { config } = await import('../../../core/src/config/env.js');
     (config as { openaiBaseUrl: string }).openaiBaseUrl = 'https://custom.api.example.com/v1';
 
     const { ChatOpenAI } = await import('@langchain/openai');
-    const { createLLM } = await import('./router.js');
+    const { createLLM } = await import('../../../core/src/llm/router.js');
 
     createLLM('gpt-4o-mini');
     expect(ChatOpenAI).toHaveBeenCalledWith(
@@ -136,7 +136,7 @@ describe('createLLM', () => {
 
   it('creates ChatOpenAI for o1-mini and o3-mini models', async () => {
     const { ChatOpenAI } = await import('@langchain/openai');
-    const { createLLM } = await import('./router.js');
+    const { createLLM } = await import('../../../core/src/llm/router.js');
 
     createLLM('o1-mini');
     expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ model: 'o1-mini' }));
@@ -148,7 +148,7 @@ describe('createLLM', () => {
 
   it('falls back to ChatOpenAI for custom model strings', async () => {
     const { ChatOpenAI } = await import('@langchain/openai');
-    const { createLLM } = await import('./router.js');
+    const { createLLM } = await import('../../../core/src/llm/router.js');
 
     createLLM('my-custom-finetuned-model');
     expect(ChatOpenAI).toHaveBeenCalledWith(
@@ -168,7 +168,7 @@ describe('createMainLLM / createSubLLM', () => {
 
   it('createMainLLM uses mainModel from config', async () => {
     const { ChatOpenAI } = await import('@langchain/openai');
-    const { createMainLLM } = await import('./router.js');
+    const { createMainLLM } = await import('../../../core/src/llm/router.js');
 
     createMainLLM();
     expect(ChatOpenAI).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-4o' }));
@@ -176,7 +176,7 @@ describe('createMainLLM / createSubLLM', () => {
 
   it('createSubLLM uses subModel from config', async () => {
     const { ChatAnthropic } = await import('@langchain/anthropic');
-    const { createSubLLM } = await import('./router.js');
+    const { createSubLLM } = await import('../../../core/src/llm/router.js');
 
     createSubLLM();
     expect(ChatAnthropic).toHaveBeenCalledWith(
@@ -191,7 +191,7 @@ describe('createMainLLM / createSubLLM', () => {
 
 describe('streamChat', () => {
   it('yields text chunks from stream', async () => {
-    const { streamChat } = await import('./router.js');
+    const { streamChat } = await import('../../../core/src/llm/router.js');
 
     const mockChunks = [{ content: 'Hello' }, { content: ' world' }, { content: '!' }];
 
@@ -214,7 +214,7 @@ describe('streamChat', () => {
   });
 
   it('skips non-string content chunks', async () => {
-    const { streamChat } = await import('./router.js');
+    const { streamChat } = await import('../../../core/src/llm/router.js');
 
     const mockChunks = [
       { content: 'text chunk' },

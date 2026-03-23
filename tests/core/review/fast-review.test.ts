@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractDiffLineMap, parseLLMResponse } from './fast-review.js';
+import { extractDiffLineMap, parseLLMResponse } from '../../../core/src/review/fast-review.js';
 
 /* ------------------------------------------------------------------ */
 /*  parseLLMResponse — exhaustive                                      */

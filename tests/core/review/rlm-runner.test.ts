@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { SnapshotBuilder } from './snapshot.js';
-import type { PRContext } from './types.js';
+import type { SnapshotBuilder } from '../../../core/src/review/snapshot.js';
+import type { PRContext } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     maxIterations: 3,
     maxLlmCalls: 5,
@@ -20,7 +20,7 @@ vi.mock('../config/env.js', () => ({
 let llmCallCount = 0;
 let llmResponses: string[] = [];
 
-vi.mock('../llm/router.js', () => ({
+vi.mock('../../../core/src/llm/router.js', () => ({
   createMainLLM: () => ({
     invoke: vi.fn(async () => {
       const response = llmResponses[llmCallCount] ?? '[]';
@@ -30,7 +30,7 @@ vi.mock('../llm/router.js', () => ({
   }),
 }));
 
-vi.mock('../sandbox/deno-runner.js', () => ({
+vi.mock('../../../core/src/sandbox/deno-runner.js', () => ({
   executeSandboxed: vi.fn(async () => ({
     stdout: 'analysis output\n',
     stderr: '',
@@ -99,7 +99,7 @@ describe('RLM Runner', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot({ 'src/index.ts': 'const x = 1;\n' });
 
@@ -120,7 +120,7 @@ describe('RLM Runner', () => {
       '[]',
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot({ 'src/index.ts': 'const x = 1;\n' });
 
@@ -133,7 +133,7 @@ describe('RLM Runner', () => {
   it('returns empty findings when LLM returns empty array', async () => {
     llmResponses = ['finish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -144,7 +144,7 @@ describe('RLM Runner', () => {
   it('streams events to the handler when provided', async () => {
     llmResponses = ['finish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
     const events: Array<{ type: string; iteration: number }> = [];
@@ -177,7 +177,7 @@ describe('RLM Runner', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 

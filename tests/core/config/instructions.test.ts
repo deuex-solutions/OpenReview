@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { findInstructionFiles, loadInstructions } from './instructions.js';
+import { findInstructionFiles, loadInstructions } from '../../../core/src/config/instructions.js';
 
 describe('findInstructionFiles', () => {
   let tempDir: string;

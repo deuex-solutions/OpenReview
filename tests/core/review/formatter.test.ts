@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatInlineComment, formatSummaryComment } from './formatter.js';
-import type { ReviewFinding, ReviewSummary } from './types.js';
+import { formatInlineComment, formatSummaryComment } from '../../../core/src/review/formatter.js';
+import type { ReviewFinding, ReviewSummary } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Helper                                                             */

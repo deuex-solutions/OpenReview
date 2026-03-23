@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OpenReviewConfig } from '../config/env.js';
-import type { ReviewFinding } from '../review/types.js';
+import type { OpenReviewConfig } from '../../../core/src/config/env.js';
+import type { ReviewFinding } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
@@ -22,7 +22,7 @@ const mockConfig: Partial<OpenReviewConfig> = {
   linterGitleaks: true,
 };
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: mockConfig,
 }));
 
@@ -72,7 +72,7 @@ describe('runLinters orchestration', () => {
   });
 
   it('returns empty array when no files provided', async () => {
-    const { runLinters } = await import('./linters.js');
+    const { runLinters } = await import('../../../core/src/review/linters.js');
 
     const findings = await runLinters([], '/repo');
 
@@ -93,7 +93,7 @@ describe('runLinters orchestration', () => {
     });
 
     // Re-import to pick up fresh module state
-    const { runLinters } = await import('./linters.js');
+    const { runLinters } = await import('../../../core/src/review/linters.js');
     const findings = await runLinters(['app.js'], '/repo');
 
     expect(findings).toEqual([]);
@@ -142,7 +142,7 @@ describe('runLinters orchestration', () => {
       },
     );
 
-    const { runLinters } = await import('./linters.js');
+    const { runLinters } = await import('../../../core/src/review/linters.js');
     const findings = await runLinters(['app.js'], '/repo');
 
     // ESLint finding should still be returned despite Semgrep failure
@@ -202,7 +202,7 @@ describe('runLinters orchestration', () => {
       },
     );
 
-    const { runLinters } = await import('./linters.js');
+    const { runLinters } = await import('../../../core/src/review/linters.js');
     const findings = await runLinters(['index.ts', 'main.py'], '/repo');
 
     expect(findings).toHaveLength(2);
@@ -218,7 +218,7 @@ describe('runLinters orchestration', () => {
     mockConfig.linterShellcheck = false;
     mockConfig.linterGitleaks = false;
 
-    const { runLinters } = await import('./linters.js');
+    const { runLinters } = await import('../../../core/src/review/linters.js');
     const findings = await runLinters(['app.js'], '/repo');
 
     expect(findings).toEqual([]);

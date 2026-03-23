@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { GitHubClient } from '../github/client.js';
-import type { ParsedDiff } from '../github/diff.js';
-
-import { SnapshotBuilder } from './snapshot.js';
+import type { GitHubClient } from '../../../core/src/github/client.js';
+import type { ParsedDiff } from '../../../core/src/github/diff.js';
+import { SnapshotBuilder } from '../../../core/src/review/snapshot.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mock config                                                        */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     maxFileBytes: 200_000,
     maxTotalBytes: 5_000_000,

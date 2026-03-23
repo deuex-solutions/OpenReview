@@ -2,14 +2,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LearningsStore, containsTrigger, formatLearningsForPrompt } from './learnings-store.js';
-import type { Learning } from './learnings-store.js';
+import {
+  LearningsStore,
+  containsTrigger,
+  formatLearningsForPrompt,
+} from '../../../core/src/learnings/learnings-store.js';
+import type { Learning } from '../../../core/src/learnings/learnings-store.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     openreviewHome: '/tmp/openreview-test',
   },

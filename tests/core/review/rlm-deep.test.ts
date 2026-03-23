@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { executeSandboxed } from '../sandbox/deno-runner.js';
-
-import type { SnapshotBuilder } from './snapshot.js';
-import type { PRContext } from './types.js';
+import type { SnapshotBuilder } from '../../../core/src/review/snapshot.js';
+import type { PRContext } from '../../../core/src/review/types.js';
+import { executeSandboxed } from '../../../core/src/sandbox/deno-runner.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     maxIterations: 3,
     maxLlmCalls: 5,
@@ -22,7 +21,7 @@ let llmCallCount = 0;
 let llmResponses: Array<string | Array<{ type: string; text: string }>> = [];
 let capturedInvokeArgs: Array<Array<{ role: string; content: string }>> = [];
 
-vi.mock('../llm/router.js', () => ({
+vi.mock('../../../core/src/llm/router.js', () => ({
   createMainLLM: () => ({
     invoke: vi.fn(async (messages: Array<{ role: string; content: string }>) => {
       capturedInvokeArgs.push([...messages]);
@@ -33,7 +32,7 @@ vi.mock('../llm/router.js', () => ({
   }),
 }));
 
-vi.mock('../sandbox/deno-runner.js', () => ({
+vi.mock('../../../core/src/sandbox/deno-runner.js', () => ({
   executeSandboxed: vi.fn(async () => ({
     stdout: 'sandbox output\n',
     stderr: '',
@@ -95,7 +94,7 @@ describe('RLM Deep — extractCodeBlock behavior', () => {
       '[]',
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot({ 'src/app.ts': 'const y = 2;\n' });
 
@@ -106,7 +105,7 @@ describe('RLM Deep — extractCodeBlock behavior', () => {
   it('skips sandbox when LLM returns no code block', async () => {
     llmResponses = ['I see no issues. finish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -129,7 +128,7 @@ describe('RLM Deep — extractFetchRequests behavior', () => {
       '[]',
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot({
       'src/app.ts': 'const y = 2;\n',
@@ -145,7 +144,7 @@ describe('RLM Deep — extractFetchRequests behavior', () => {
   it('does not re-fetch files already in the snapshot', async () => {
     llmResponses = ['FETCH_FILE: src/app.ts\nfinish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot({ 'src/app.ts': 'const y = 2;\n' });
 
@@ -170,7 +169,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
   it('handles malformed JSON in finalization gracefully', async () => {
     llmResponses = ['finish_review', 'This is not valid JSON at all { broken ['];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -188,7 +187,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -216,7 +215,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -243,7 +242,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -267,7 +266,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -290,7 +289,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -313,7 +312,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -338,7 +337,7 @@ describe('RLM Deep — parseRLMFindings behavior', () => {
         '\n```\nThat is all.',
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -363,7 +362,7 @@ describe('RLM Deep — edge conditions', () => {
       '[]',
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 
@@ -375,7 +374,7 @@ describe('RLM Deep — edge conditions', () => {
   it('handles empty diff', async () => {
     llmResponses = ['finish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR({ diff: '' });
     const snapshot = createMockSnapshot();
 
@@ -386,7 +385,7 @@ describe('RLM Deep — edge conditions', () => {
   it('injects learnings into the system prompt', async () => {
     llmResponses = ['finish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR({
       learnings: ['Always check for null returns', 'Prefer immutable data'],
     });
@@ -405,7 +404,7 @@ describe('RLM Deep — edge conditions', () => {
   it('injects instructions into the system prompt', async () => {
     llmResponses = ['finish_review', '[]'];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR({
       instructions: 'Focus on security vulnerabilities only.',
     });
@@ -442,7 +441,7 @@ describe('RLM Deep — edge conditions', () => {
       ]),
     ];
 
-    const { runRLM } = await import('./rlm-runner.js');
+    const { runRLM } = await import('../../../core/src/review/rlm-runner.js');
     const pr = createMockPR();
     const snapshot = createMockSnapshot();
 

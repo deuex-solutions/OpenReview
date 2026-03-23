@@ -2,7 +2,7 @@ import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GitHubClient, parsePRUrl } from './client.js';
+import { GitHubClient, parsePRUrl } from '../../../core/src/github/client.js';
 
 /* ------------------------------------------------------------------ */
 /*  PR URL parsing                                                     */

@@ -1,16 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { GitHubClient } from '../github/client.js';
-import type { SnapshotBuilder } from '../review/snapshot.js';
-import type { PRContext } from '../review/types.js';
-
-import type { ChatContext, CommentEvent } from './chat-handler.js';
+import type { ChatContext, CommentEvent } from '../../../core/src/chat/chat-handler.js';
+import type { GitHubClient } from '../../../core/src/github/client.js';
+import type { SnapshotBuilder } from '../../../core/src/review/snapshot.js';
+import type { PRContext } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../config/env.js', () => ({
+vi.mock('../../../core/src/config/env.js', () => ({
   config: {
     mainModel: 'gpt-4o',
     subModel: 'gpt-4o-mini',
@@ -20,7 +19,7 @@ vi.mock('../config/env.js', () => ({
 
 let streamChunks: string[] = [];
 
-vi.mock('../llm/router.js', () => ({
+vi.mock('../../../core/src/llm/router.js', () => ({
   createMainLLM: () => ({
     invoke: vi.fn(async () => ({ content: 'mocked response' })),
     stream: vi.fn(),
@@ -37,7 +36,7 @@ vi.mock('../llm/router.js', () => ({
 
 let postedReplies: Array<{ prNumber: number; body: string }> = [];
 
-vi.mock('../github/comments.js', () => ({
+vi.mock('../../../core/src/github/comments.js', () => ({
   CommentPoster: class {
     async postChatReply(prNumber: number, body: string) {
       postedReplies.push({ prNumber, body });
@@ -45,7 +44,7 @@ vi.mock('../github/comments.js', () => ({
   },
 }));
 
-vi.mock('./suggestions.js', () => ({
+vi.mock('../../../core/src/chat/suggestions.js', () => ({
   generateSuggestions: vi.fn(async () => ['What about edge cases?', 'Any performance concerns?']),
 }));
 
@@ -110,7 +109,7 @@ describe('handleChatMention', () => {
   });
 
   it('extracts question and posts a reply using prNumber', async () => {
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
 
     const event: CommentEvent = {
       commentId: 123,
@@ -127,7 +126,7 @@ describe('handleChatMention', () => {
   });
 
   it('appends follow-up suggestions to the reply', async () => {
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
 
     const event: CommentEvent = {
       commentId: 123,
@@ -144,7 +143,7 @@ describe('handleChatMention', () => {
   });
 
   it('ignores comments from the bot itself to prevent loops', async () => {
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
 
     const event: CommentEvent = {
       commentId: 123,
@@ -159,7 +158,7 @@ describe('handleChatMention', () => {
   });
 
   it('ignores comments with custom bot username', async () => {
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
 
     const event: CommentEvent = {
       commentId: 123,
@@ -174,7 +173,7 @@ describe('handleChatMention', () => {
   });
 
   it('ignores comments without @openreview mention content', async () => {
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
 
     const event: CommentEvent = {
       commentId: 123,
@@ -189,7 +188,7 @@ describe('handleChatMention', () => {
   });
 
   it('loads thread history via public getIssueComments method', async () => {
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
     const client = createMockClient();
 
     const event: CommentEvent = {
@@ -207,7 +206,7 @@ describe('handleChatMention', () => {
   it('does not post empty reply when LLM returns no chunks', async () => {
     streamChunks = []; // LLM yields nothing
 
-    const { handleChatMention } = await import('./chat-handler.js');
+    const { handleChatMention } = await import('../../../core/src/chat/chat-handler.js');
 
     const event: CommentEvent = {
       commentId: 123,

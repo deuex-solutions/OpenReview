@@ -7,8 +7,8 @@ import {
   parseRuffOutput,
   parseSemgrepOutput,
   parseShellcheckOutput,
-} from './linters.js';
-import type { ReviewFinding } from './types.js';
+} from '../../../core/src/review/linters.js';
+import type { ReviewFinding } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  ESLint parser                                                      */

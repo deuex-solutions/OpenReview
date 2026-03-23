@@ -5,7 +5,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     passWithNoTests: true,
-    include: ['core/**/*.test.ts', 'cli/**/*.test.ts', 'action/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'cli/**/*.test.ts', 'action/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

@@ -1,20 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createMainLLM } from '../llm/router.js';
-
-import { runFastReview } from './fast-review.js';
-import { deduplicateFindings, runLinters } from './linters.js';
-import type { PRContext, ReviewFinding } from './types.js';
+import { createMainLLM } from '../../../core/src/llm/router.js';
+import { runFastReview } from '../../../core/src/review/fast-review.js';
+import { deduplicateFindings, runLinters } from '../../../core/src/review/linters.js';
+import type { PRContext, ReviewFinding } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mocks                                                              */
 /* ------------------------------------------------------------------ */
 
-vi.mock('../llm/router.js', () => ({
+vi.mock('../../../core/src/llm/router.js', () => ({
   createMainLLM: vi.fn(),
 }));
 
-vi.mock('./linters.js', () => ({
+vi.mock('../../../core/src/review/linters.js', () => ({
   runLinters: vi.fn(),
   deduplicateFindings: vi.fn(),
 }));

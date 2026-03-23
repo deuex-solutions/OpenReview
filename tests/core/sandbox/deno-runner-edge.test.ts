@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { executeSandboxed, verifyDenoInstallation } from './deno-runner.js';
+import { executeSandboxed, verifyDenoInstallation } from '../../../core/src/sandbox/deno-runner.js';
 
 /* ------------------------------------------------------------------ */
 /*  Mock child_process.execFile for deterministic tests                */
