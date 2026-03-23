@@ -482,7 +482,101 @@ OPENREVIEW_HOME=~/.openreview # Base path for learnings + traces
 
 ---
 
-### 4.12 SKILL.md (Agent Ecosystem)
+### 4.12 Impact Analysis
+
+**User story:** As a developer or tester, when I make changes to any part of the codebase, I want to see every file and UI component affected by those changes — so I know the full blast radius before the review is complete.
+
+**How it works (Phase 1 — Tree-sitter Static Analysis):**
+1. User runs `openreview review` → prompted "Include impact analysis? (y/n)" (or uses `--impact` flag)
+2. Changed files identified from git diff + staged changes (default) or manual `--files` override
+3. Tree-sitter parses changed files to extract exports, imports, and symbol references (language-agnostic)
+4. Dependency graph built: maps every file to its direct and transitive dependents
+5. Full transitive traversal from changed files to leaf nodes (pages/entry points)
+6. Smart relevance scoring applied: direct dependents (score: 1.0) > 2nd degree (0.7) > 3rd degree (0.5) > deeper (diminishing)
+7. Component-to-page mapper identifies which UI pages/routes are affected
+8. Results integrated into review output: standalone summary + per-finding enrichment
+
+**How it works (Phase 2 — LLM Semantic Analysis):**
+1. Tree-sitter graph passed to LangGraph agent as initial context
+2. LLM reasons about data flow: form data → API route → backend handler → database query
+3. Screenshot diffing: app run in sandbox before/after, headless browser captures affected pages
+4. Live preview: sandbox renders affected pages with annotated component overlays
+5. Results posted as GitHub PR comment + interactive HTML report
+
+**Input sources:**
+- Default: git diff + staged changes (same input as review engine)
+- Override: `--files src/Button.tsx,src/Form.tsx` for ad-hoc exploration
+
+**CLI flags:**
+- `--impact` — include impact analysis without interactive prompt
+- `--no-impact` — skip impact analysis without interactive prompt
+- `--files <paths>` — override input with specific files (comma-separated)
+
+**Output (Phase 1):**
+- Terminal: structured tree of impacted files with proximity scores and import chain paths
+- JSON report: machine-readable `impact-report.json` for CI/CD integration
+- Component mapping: textual list of affected UI pages/routes
+- Review integration: standalone "Impact Analysis" section in review output
+- Finding enrichment: each `ReviewFinding` annotated with impact scope
+
+**Output (Phase 2 — Future):**
+- GitHub PR comment with collapsible impact summary table
+- Screenshot diffs (before/after visual comparison)
+- Interactive HTML report with dependency graph visualization
+- Live sandbox preview with annotated components
+
+**Data model:**
+```typescript
+interface ImpactNode {
+  file: string;
+  importedSymbols: string[];       // what symbols are used from the changed file
+  proximity: number;               // 1 = direct, 2 = 2nd degree, etc.
+  relevanceScore: number;          // 0.0–1.0, higher = more affected
+  importChain: string[];           // full chain: ['Button.tsx', 'LoginForm.tsx', 'LoginPage.tsx']
+}
+
+interface ImpactResult {
+  changedFiles: string[];          // input: files that changed
+  impactedFiles: ImpactNode[];     // output: all affected files, scored
+  affectedPages: string[];         // UI pages/routes affected
+  affectedComponents: string[];    // UI components affected
+  summary: {
+    totalImpacted: number;
+    directDependents: number;
+    transitiveDependents: number;
+    affectedPageCount: number;
+  };
+}
+```
+
+**Acceptance criteria (Phase 1):**
+- Tree-sitter graph built for any language with a Tree-sitter grammar
+- Full transitive tracing with configurable depth threshold
+- Relevance scoring ranks direct dependents above transitive ones
+- Component-to-page mapping identifies affected UI routes/pages
+- Interactive prompt shown during `openreview review` (skippable via flags)
+- Terminal output shows structured impact tree with scores
+- JSON report generated alongside review output
+- Each review finding enriched with impact scope annotation
+- Findings in high-impact files prioritized in review output
+- Impact analysis completes in < 30 seconds for repos with ≤ 500 files
+
+**Acceptance criteria (Phase 2):**
+- LLM-powered data-flow analysis identifies cross-boundary impacts (frontend → backend → database)
+- Screenshot diffing highlights visual UI changes with before/after comparison
+- Live sandbox preview renders affected pages with component annotations
+- GitHub PR comment includes collapsible impact summary
+- Interactive HTML dashboard visualizable via `web/`
+
+**Sandbox environment:**
+- Phase 1: Deno sandbox (existing) for lightweight component analysis
+- Phase 2: Docker container for full app rendering + headless browser screenshots; local dev server support for CLI usage
+
+**Module location:** `core/src/impact/` — standalone module integrated into review pipeline via `core/src/review/`
+
+---
+
+### 4.13 SKILL.md (Agent Ecosystem)
 
 **Acceptance criteria:**
 - `SKILL.md` at repo root enables installation as a skill in: Claude Code, Cursor, Gemini CLI, Codex
@@ -536,6 +630,7 @@ OPENREVIEW_HOME=~/.openreview # Base path for learnings + traces
 - MCP server integration (Phase 3)
 - `.reviewbuddy.yaml` per-repo config (Phase 2)
 - Central org-wide config repo (Phase 3)
+- Impact Analysis Phase 2: LLM data-flow analysis, screenshot diffing, live preview, GitHub PR comment, interactive HTML report, Docker sandbox for UI rendering (Phase 2)
 
 ---
 

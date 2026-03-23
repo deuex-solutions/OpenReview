@@ -82,6 +82,34 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 - `README.md` — Setup guide, examples, configuration reference
 - Public launch: GitHub repo public, npm package published
 
+#### Week 5–6 — Impact Analysis (Phase 1 MVP)
+
+**Goal:** When a developer runs `openreview review`, optionally identify all files and UI components affected by the changes in the PR — providing a full blast-radius view alongside the existing review findings.
+
+- `core/src/impact/` — New module for impact analysis engine
+  - `core/src/impact/types.ts` — Impact-specific types: `ImpactNode`, `ImpactGraph`, `ImpactResult`, proximity/relevance scoring types
+  - `core/src/impact/tree-sitter.ts` — Tree-sitter based import/dependency graph builder (language-agnostic, supports JS/TS, Python, Go, Java, Ruby, Rust, etc.)
+  - `core/src/impact/graph.ts` — Dependency graph traversal with transitive tracing and relevance scoring (direct > 2nd degree > 3rd degree)
+  - `core/src/impact/analyzer.ts` — Main entry point: takes changed files (git diff + staged), builds graph, returns scored impact results
+  - `core/src/impact/component-mapper.ts` — Textual component-to-page/route mapping (which UI pages/routes are affected by changed files)
+- Integration into review pipeline
+  - Interactive prompt during `openreview review`: "Would you like to include impact analysis? (y/n)"
+  - `--impact` / `--no-impact` CLI flags to skip the prompt (for CI/automation)
+  - `--files <paths>` override flag for manual file targeting (ad-hoc exploration)
+  - Default input: git diff + staged changes; `--files` overrides with arbitrary file list
+- Output — Terminal
+  - Structured tree of impacted files with proximity scores and import chain paths
+  - Component-to-page mapping section (which UI pages/routes are affected)
+- Output — JSON report
+  - Machine-readable JSON report file for CI/CD integration
+- Review integration
+  - Standalone "Impact Analysis" summary section in review output
+  - Each `ReviewFinding` enriched with impact scope annotation (e.g., "This bug in `Button.tsx` affects 12 files across 3 pages")
+  - Impact-based prioritization: findings in high-impact files surface first
+- Types integrated into `core/src/review/types.ts` (canonical source of truth)
+- Config: `IMPACT_ENABLED`, `IMPACT_DEPTH_THRESHOLD` env vars in `core/src/config/env.ts`
+- Unit tests for graph building, traversal, scoring, and component mapping
+
 ---
 
 ## M2 — Growth (Phase 2) · Target: 8–12 Weeks Post-MVP
@@ -152,6 +180,14 @@ Transform OpenReview from a CLI tool into a full product experience — with a W
 #### 2.9 Sequence Diagram Generation
 - Auto-generated Mermaid diagrams posted in summary comment
 - Shows component interactions for complex PRs
+
+#### 2.10 Impact Analysis (Phase 2 — Advanced)
+- **LLM-powered semantic/data-flow analysis** via LangGraph — tracks how data flows across the codebase (e.g., form data → API route → backend handler → database query)
+- **Screenshot diffing** — Run target app in sandbox before/after changes, capture screenshots, visually highlight UI regions affected (pixel-level or component-level diff)
+- **Live preview in sandbox** — Spin up app in sandbox, render affected pages, annotate impacted components with overlay markers
+- **GitHub PR comment** — Post impact analysis summary as a collapsible table in the PR comment (impacted files grouped by category, proximity scores, affected pages)
+- **Interactive HTML report / web dashboard** — Generate visual dependency graph with highlighted impact zones, serve via `web/` (React 19 + Vite 8)
+- **Docker container sandbox** — Docker-based environment for running UI rendering and screenshot diffing in CI contexts (complements Deno sandbox from Phase 1)
 
 ---
 
