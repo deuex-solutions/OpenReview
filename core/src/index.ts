@@ -32,6 +32,10 @@ export type {
   FindingSource,
 } from './review/types.js';
 
+// Learnings
+export { LearningsStore, containsTrigger, formatLearningsForPrompt } from './learnings/learnings-store.js';
+export type { Learning } from './learnings/learnings-store.js';
+
 // Chat
 export { handleChatMention } from './chat/chat-handler.js';
 export type { CommentEvent, ChatContext } from './chat/chat-handler.js';
