@@ -1,183 +1,217 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { formatInlineComment, formatSummaryComment } from '../review/formatter.js';
 import type { ReviewFinding, ReviewSummary } from '../review/types.js';
 
+import type { GitHubClient } from './client.js';
+import { CommentPoster } from './comments.js';
+
+vi.mock('../review/formatter.js', () => ({
+  formatInlineComment: vi.fn((f: ReviewFinding) => `inline:${f.id}`),
+  formatSummaryComment: vi.fn(
+    (s: ReviewSummary) => `<!-- openreview-summary -->\nsummary:${s.totalFindings}`,
+  ),
+}));
+
 /* ------------------------------------------------------------------ */
-/*  formatInlineComment                                                */
+/*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-describe('formatInlineComment', () => {
-  it('formats a finding with severity badge and explanation', () => {
-    const finding: ReviewFinding = {
-      id: 'test-1',
-      category: 'bug',
-      severity: 'severe',
-      file: 'src/index.ts',
-      startLine: 10,
-      endLine: 10,
-      title: 'Potential null dereference',
-      explanation: 'The variable `user` may be undefined at this point.',
-      source: 'ai',
-      citations: [],
-    };
+function makeMockClient() {
+  const api = {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+  };
 
-    const result = formatInlineComment(finding);
-    expect(result).toContain('**Bug — Severe**');
-    expect(result).toContain('Potential null dereference');
-    expect(result).toContain('The variable `user` may be undefined');
+  const client = {
+    owner: 'test-owner',
+    repo: 'test-repo',
+    api,
+  } as unknown as GitHubClient;
+
+  return { client, api };
+}
+
+function makeFinding(id: string, file = 'src/index.ts', line = 10): ReviewFinding {
+  return {
+    id,
+    category: 'bug',
+    severity: 'severe',
+    file,
+    startLine: line,
+    endLine: line,
+    title: `Finding ${id}`,
+    explanation: 'Test explanation',
+    source: 'ai',
+    citations: [],
+  };
+}
+
+function makeSummary(totalFindings = 3): ReviewSummary {
+  return {
+    filesReviewed: 5,
+    duration: '10s',
+    mode: 'fast',
+    findingsBySeverity: { severe: 1, 'non-severe': 1, investigate: 1, informational: 0 },
+    totalFindings,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  postReview                                                         */
+/* ------------------------------------------------------------------ */
+
+describe('postReview', () => {
+  let poster: CommentPoster;
+  let api: ReturnType<typeof makeMockClient>['api'];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ({ client: poster, api } = (() => {
+      const m = makeMockClient();
+      return { client: new CommentPoster(m.client), api: m.api };
+    })());
   });
 
-  it('includes a suggested fix code block when provided', () => {
-    const finding: ReviewFinding = {
-      id: 'test-2',
-      category: 'flag',
-      severity: 'investigate',
-      file: 'src/index.ts',
-      startLine: 5,
-      endLine: 5,
-      title: 'Use optional chaining',
-      explanation: 'Safer to use optional chaining here.',
-      suggestedFix: 'const name = user?.name ?? "unknown";',
-      source: 'ai',
-      citations: [],
-    };
+  it('posts batch review with correct endpoint and body', async () => {
+    const findings = [makeFinding('f1', 'a.ts', 5), makeFinding('f2', 'b.ts', 12)];
+    api.post.mockResolvedValue({ data: {} });
 
-    const result = formatInlineComment(finding);
-    expect(result).toContain('```suggestion');
-    expect(result).toContain('const name = user?.name ?? "unknown";');
-    expect(result).toContain('**Suggested fix:**');
+    await poster.postReview(42, findings);
+
+    expect(api.post).toHaveBeenCalledOnce();
+    const [url, body] = api.post.mock.calls[0];
+    expect(url).toBe('/repos/test-owner/test-repo/pulls/42/reviews');
+    expect(body.event).toBe('COMMENT');
+    expect(body.comments).toHaveLength(2);
+    expect(body.comments[0]).toEqual({
+      path: 'a.ts',
+      line: 5,
+      side: 'RIGHT',
+      body: 'inline:f1',
+    });
+    expect(body.comments[1]).toEqual({
+      path: 'b.ts',
+      line: 12,
+      side: 'RIGHT',
+      body: 'inline:f2',
+    });
   });
 
-  it('handles all severity levels', () => {
-    const severities = ['severe', 'non-severe', 'investigate', 'informational'] as const;
-    for (const severity of severities) {
-      const result = formatInlineComment({
-        id: `test-${severity}`,
-        category: severity === 'severe' || severity === 'non-severe' ? 'bug' : 'flag',
-        severity,
-        file: 'a.ts',
-        startLine: 1,
-        endLine: 1,
-        title: 'Test',
-        explanation: 'Test',
-        source: 'ai',
-        citations: [],
-      });
-      expect(result.length).toBeGreaterThan(0);
-    }
-  });
+  it('skips when findings is empty', async () => {
+    await poster.postReview(42, []);
 
-  it('shows linter attribution for linter findings', () => {
-    const finding: ReviewFinding = {
-      id: 'test-lint',
-      category: 'flag',
-      severity: 'informational',
-      file: 'a.ts',
-      startLine: 1,
-      endLine: 1,
-      title: 'ESLint: no-unused-vars',
-      explanation: 'Variable is unused.',
-      source: 'linter',
-      linterName: 'ESLint',
-      citations: [],
-    };
-
-    const result = formatInlineComment(finding);
-    expect(result).toContain('Source: ESLint');
-  });
-
-  it('shows combined attribution for merged findings', () => {
-    const finding: ReviewFinding = {
-      id: 'test-both',
-      category: 'bug',
-      severity: 'non-severe',
-      file: 'a.ts',
-      startLine: 1,
-      endLine: 1,
-      title: 'Potential issue',
-      explanation: 'Detected by both.',
-      source: 'both',
-      linterName: 'Ruff',
-      citations: [],
-    };
-
-    const result = formatInlineComment(finding);
-    expect(result).toContain('Source: AI + Ruff');
+    expect(api.post).not.toHaveBeenCalled();
   });
 });
 
 /* ------------------------------------------------------------------ */
-/*  formatSummaryComment                                               */
+/*  postSummaryComment                                                 */
 /* ------------------------------------------------------------------ */
 
-describe('formatSummaryComment', () => {
-  it('includes the HTML marker for replace-not-duplicate', () => {
-    const summary: ReviewSummary = {
-      totalFindings: 3,
-      findingsBySeverity: { severe: 0, 'non-severe': 1, investigate: 2, informational: 0 },
-      filesReviewed: 5,
-      duration: '12s',
-      mode: 'fast',
-    };
+describe('postSummaryComment', () => {
+  let poster: CommentPoster;
+  let api: ReturnType<typeof makeMockClient>['api'];
 
-    const result = formatSummaryComment(summary);
-    expect(result).toContain('<!-- openreview-summary -->');
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const m = makeMockClient();
+    poster = new CommentPoster(m.client);
+    api = m.api;
   });
 
-  it('shows severity table for findings', () => {
-    const summary: ReviewSummary = {
-      totalFindings: 3,
-      findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 2, informational: 0 },
-      filesReviewed: 10,
-      duration: '8s',
-      mode: 'rlm',
-    };
+  it('creates new comment when no existing summary', async () => {
+    // findSummaryComment returns null (no marker found, single page with < 100 results)
+    api.get.mockResolvedValue({ data: [] });
+    api.post.mockResolvedValue({ data: {} });
 
-    const result = formatSummaryComment(summary);
-    expect(result).toContain('**Bug — Severe**');
-    expect(result).toContain('**Flag — Investigate**');
-    expect(result).toContain('**Total:** 3 findings');
+    await poster.postSummaryComment(7, makeSummary());
+
+    expect(api.post).toHaveBeenCalledOnce();
+    const [url, body] = api.post.mock.calls[0];
+    expect(url).toBe('/repos/test-owner/test-repo/issues/7/comments');
+    expect(body.body).toContain('<!-- openreview-summary -->');
   });
 
-  it('shows success message when no findings', () => {
-    const summary: ReviewSummary = {
-      totalFindings: 0,
-      findingsBySeverity: { severe: 0, 'non-severe': 0, investigate: 0, informational: 0 },
-      filesReviewed: 3,
-      duration: '2s',
-      mode: 'fast',
-    };
+  it('updates existing comment when marker found', async () => {
+    api.get.mockResolvedValue({
+      data: [
+        { id: 100, body: 'unrelated comment' },
+        { id: 200, body: '<!-- openreview-summary -->\nold summary' },
+      ],
+    });
+    api.patch.mockResolvedValue({ data: {} });
 
-    const result = formatSummaryComment(summary);
-    expect(result).toContain('No issues found');
+    await poster.postSummaryComment(7, makeSummary(5));
+
+    expect(api.patch).toHaveBeenCalledOnce();
+    const [url, body] = api.patch.mock.calls[0];
+    expect(url).toBe('/repos/test-owner/test-repo/issues/comments/200');
+    expect(body.body).toContain('<!-- openreview-summary -->');
+    expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('includes trigger hints', () => {
-    const summary: ReviewSummary = {
-      totalFindings: 0,
-      findingsBySeverity: { severe: 0, 'non-severe': 0, investigate: 0, informational: 0 },
-      filesReviewed: 1,
-      duration: '1s',
-      mode: 'fast',
-    };
+  it('paginates to find existing marker comment', async () => {
+    // First page: 100 comments, none with marker
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      body: `comment ${i}`,
+    }));
+    // Second page: fewer than 100, one has the marker
+    const page2 = [
+      { id: 201, body: 'another comment' },
+      { id: 202, body: '<!-- openreview-summary -->\nold' },
+    ];
 
-    const result = formatSummaryComment(summary);
-    expect(result).toContain('`@openreview rlm`');
-    expect(result).toContain('`@openreview <your question>`');
+    api.get.mockResolvedValueOnce({ data: page1 }).mockResolvedValueOnce({ data: page2 });
+    api.patch.mockResolvedValue({ data: {} });
+
+    await poster.postSummaryComment(7, makeSummary());
+
+    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(api.get.mock.calls[0][1]).toEqual({ params: { per_page: 100, page: 1 } });
+    expect(api.get.mock.calls[1][1]).toEqual({ params: { per_page: 100, page: 2 } });
+    expect(api.patch).toHaveBeenCalledWith(
+      '/repos/test-owner/test-repo/issues/comments/202',
+      expect.objectContaining({ body: expect.stringContaining('<!-- openreview-summary -->') }),
+    );
   });
+});
 
-  it('uses singular "finding" for count of 1', () => {
-    const summary: ReviewSummary = {
-      totalFindings: 1,
-      findingsBySeverity: { severe: 0, 'non-severe': 0, investigate: 0, informational: 1 },
-      filesReviewed: 1,
-      duration: '1s',
-      mode: 'fast',
-    };
+/* ------------------------------------------------------------------ */
+/*  postChatReply                                                      */
+/* ------------------------------------------------------------------ */
 
-    const result = formatSummaryComment(summary);
-    expect(result).toContain('**Total:** 1 finding');
-    expect(result).not.toContain('1 findings');
+describe('postChatReply', () => {
+  it('posts to correct /issues/{prNumber}/comments endpoint', async () => {
+    const { client, api } = makeMockClient();
+    const poster = new CommentPoster(client);
+    api.post.mockResolvedValue({ data: {} });
+
+    await poster.postChatReply(99, 'Here is my reply');
+
+    expect(api.post).toHaveBeenCalledOnce();
+    const [url, body] = api.post.mock.calls[0];
+    expect(url).toBe('/repos/test-owner/test-repo/issues/99/comments');
+    expect(body).toEqual({ body: 'Here is my reply' });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  postAcknowledgement                                                */
+/* ------------------------------------------------------------------ */
+
+describe('postAcknowledgement', () => {
+  it('posts standalone comment', async () => {
+    const { client, api } = makeMockClient();
+    const poster = new CommentPoster(client);
+    api.post.mockResolvedValue({ data: {} });
+
+    await poster.postAcknowledgement(15, 'Got it, reviewing now...');
+
+    expect(api.post).toHaveBeenCalledOnce();
+    const [url, body] = api.post.mock.calls[0];
+    expect(url).toBe('/repos/test-owner/test-repo/issues/15/comments');
+    expect(body).toEqual({ body: 'Got it, reviewing now...' });
   });
 });
