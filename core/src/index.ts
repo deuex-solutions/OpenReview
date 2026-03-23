@@ -15,6 +15,8 @@ export { CommentPoster } from './github/comments.js';
 
 // Review
 export { runFastReview } from './review/fast-review.js';
+export { runRLM } from './review/rlm-runner.js';
+export type { RLMEvent, RLMEventHandler, RLMEventType } from './review/rlm-runner.js';
 export { SnapshotBuilder } from './review/snapshot.js';
 export type { SnapshotOptions } from './review/snapshot.js';
 export { runLinters, deduplicateFindings } from './review/linters.js';
