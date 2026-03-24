@@ -1,3 +1,4 @@
+/* eslint-disable no-undef, no-console */
 import { runFastReview } from '../../core/dist/index.mjs';
 
 const testPRs = [
