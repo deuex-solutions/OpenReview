@@ -234,7 +234,7 @@ pnpm lint
 pnpm format:check
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [SETUP.md](SETUP.md) for detailed setup instructions.
+See [GETTING_STARTED.md](GETTING_STARTED.md) for the full setup guide, [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines, and [SETUP.md](SETUP.md) for detailed configuration reference.
 
 ## Roadmap
 
