@@ -251,7 +251,7 @@ interface Citation {
 2. Build hybrid codebase snapshot:
    - Fetch diff + changed files immediately via GitHub API
    - Full repo file tree fetched on demand as the agent requests files during reasoning
-3. LangGraph agent starts iterative loop (up to `MAX_ITERATIONS`, default 20):
+3. LangGraph agent starts iterative loop (up to `MAX_ITERATIONS`, default 12):
    - **Reason**: LLM reasons about the code given current context
    - **Write Code**: LLM writes TypeScript/Python verification script
    - **Execute**: Script runs in Deno sandbox (read-only)
@@ -268,7 +268,7 @@ interface Citation {
 - Every finding includes citations with exact file path and line number(s)
 - Trace log saved per review: `~/.openreview/traces/<timestamp>-<owner>-<repo>-<pr>.json`
 - Trace contains: all iterations, reasoning steps, code written, sandbox output, final answer
-- RLM mode respects `MAX_ITERATIONS` (default: 20) and `MAX_LLM_CALLS` (default: 25)
+- RLM mode respects `MAX_ITERATIONS` (default: 12) and `MAX_LLM_CALLS` (default: 35)
 - Deno sandbox is read-only: no file writes, no network calls outside approved list
 
 **LangGraph node definitions:**
@@ -487,8 +487,8 @@ MAIN_MODEL=gpt-4o           # Primary model for deep review and chat
 SUB_MODEL=gpt-4o-mini       # Secondary model for summarization and suggestions
 
 # Review limits
-MAX_ITERATIONS=20            # Max RLM loop iterations
-MAX_LLM_CALLS=25             # Max total LLM calls per RLM session
+MAX_ITERATIONS=12            # Max RLM loop iterations
+MAX_LLM_CALLS=35             # Max total LLM calls per RLM session
 MAX_FILES=100                # Max files per review
 MAX_FILE_BYTES=200000        # Max bytes per individual file in snapshot
 MAX_TOTAL_BYTES=5000000      # Max total snapshot size

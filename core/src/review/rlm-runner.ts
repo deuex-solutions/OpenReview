@@ -68,15 +68,23 @@ function buildReasonNode(pr: PRContext, snapshot: SnapshotBuilder, onEvent?: RLM
     onEvent?.({ type: 'iteration', iteration, message: `Starting iteration ${iteration}` });
 
     const systemPrompt = buildRLMSystemPrompt(pr);
+    const remaining = config.maxIterations - iteration;
+    const urgency =
+      remaining <= 2
+        ? '\n⚠️ You are running low on iterations. Call finish_review NOW unless you have a critical investigation remaining.'
+        : remaining <= 4
+          ? '\n⏳ Iterations are limited — focus on the most impactful findings and converge soon.'
+          : '';
+
     const messages = [
       { role: 'system', content: systemPrompt },
       ...state.messages,
       {
         role: 'human',
         content:
-          `Iteration ${iteration}. ` +
+          `Iteration ${iteration} of ${config.maxIterations}.${urgency}\n` +
           'Analyze the code and either:\n' +
-          '1. Write a code block to investigate further (will be executed in a Deno sandbox)\n' +
+          '1. Write a CONCISE code block to investigate further (will be executed in a Deno sandbox)\n' +
           '2. Call finish_review if you have enough information\n\n' +
           'Available files in GLOBALS: ' +
           Object.keys(state.files).join(', ') +
@@ -316,6 +324,10 @@ export async function runRLM(
     .addEdge('finalize', END)
     .compile();
 
+  // Each iteration traverses ~4 nodes (reason→code_writer→sandbox→observe),
+  // plus START and finalize. Set recursionLimit high enough for maxIterations.
+  const recursionLimit = config.maxIterations * 5 + 10;
+
   const result = await graph.invoke({
     messages: [
       {
@@ -330,7 +342,7 @@ export async function runRLM(
     files: initialFiles,
     findings: [],
     done: false,
-  });
+  }, { recursionLimit });
 
   return result.findings;
 }
@@ -357,6 +369,12 @@ function buildRLMSystemPrompt(pr: PRContext): string {
     '- Parses file contents from GLOBALS',
     '- Checks for patterns, anti-patterns, or bugs',
     '- Outputs findings to stdout',
+    '',
+    'Efficiency guidelines:',
+    '- Each iteration costs time. Investigate multiple concerns per iteration when possible.',
+    '- Write focused, concise scripts — avoid unnecessary complexity.',
+    '- Call finish_review as soon as you have sufficient evidence. Do not exhaust all iterations.',
+    '- Aim to complete your analysis in 4-6 iterations for typical PRs.',
     '',
     `Repository: ${pr.owner}/${pr.repo}`,
     `PR #${pr.prNumber}: ${pr.metadata.title}`,

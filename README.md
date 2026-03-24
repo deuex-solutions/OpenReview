@@ -91,7 +91,7 @@ Key settings:
 | `MAIN_MODEL`          | `gpt-4o`      | Primary model for review and chat |
 | `SUB_MODEL`           | `gpt-4o-mini` | Secondary model for suggestions   |
 | `MAX_FILES`           | `100`         | Max files per review              |
-| `MAX_ITERATIONS`      | `20`          | Max RLM loop iterations           |
+| `MAX_ITERATIONS`      | `12`          | Max RLM loop iterations           |
 | `DEFAULT_REVIEW_MODE` | `fast`        | Default mode: `fast` or `rlm`     |
 | `INCLUDE_GLOBS`       | —             | File patterns to include          |
 | `EXCLUDE_GLOBS`       | —             | File patterns to exclude          |

@@ -206,8 +206,8 @@ describe('Rate limit interceptor', () => {
     new GitHubClient({ token: 'tok', owner: 'o', repo: 'r' });
 
     const mockInstance = createSpy.mock.results[0].value as AxiosInstance;
-    // Two interceptors should be registered (rate limit + retry)
-    expect(mockInstance.interceptors.response.use).toHaveBeenCalledTimes(2);
+    // Three interceptors should be registered (auth error + rate limit + retry)
+    expect(mockInstance.interceptors.response.use).toHaveBeenCalledTimes(3);
 
     vi.restoreAllMocks();
   });

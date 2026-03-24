@@ -57,6 +57,7 @@ export type { SandboxResult } from './sandbox/deno-runner.js';
 export {
   createLLM,
   createMainLLM,
+  createStructuredLLM,
   createSubLLM,
   detectProvider,
   streamChat,

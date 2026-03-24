@@ -134,7 +134,7 @@ describe('parseLLMResponse', () => {
     expect(findings[0].endLine).toBe(10);
   });
 
-  it('defaults unknown severity to investigate', () => {
+  it('defaults unknown severity using category hint', () => {
     const response = JSON.stringify([
       {
         category: 'bug',
@@ -147,16 +147,18 @@ describe('parseLLMResponse', () => {
     ]);
 
     const findings = parseLLMResponse(response);
-    expect(findings[0].severity).toBe('investigate');
+    // "bug" category maps to "non-severe" when severity is unrecognized
+    expect(findings[0].severity).toBe('non-severe');
   });
 
-  it('defaults missing severity to investigate', () => {
+  it('defaults missing severity using category hint', () => {
     const response = JSON.stringify([
       { category: 'bug', file: 'a.ts', startLine: 1, title: 'T', explanation: 'E' },
     ]);
 
     const findings = parseLLMResponse(response);
-    expect(findings[0].severity).toBe('investigate');
+    // "bug" category maps to "non-severe" when severity is missing
+    expect(findings[0].severity).toBe('non-severe');
   });
 
   it('defaults unknown category to flag', () => {
@@ -312,7 +314,7 @@ describe('parseLLMResponse', () => {
 /* ------------------------------------------------------------------ */
 
 describe('extractDiffLineMap', () => {
-  it('extracts added line numbers per file', () => {
+  it('extracts added and context line numbers per file', () => {
     const diff = `diff --git a/src/index.ts b/src/index.ts
 --- a/src/index.ts
 +++ b/src/index.ts
@@ -325,10 +327,10 @@ describe('extractDiffLineMap', () => {
     const map = extractDiffLineMap(diff);
     expect(map.has('src/index.ts')).toBe(true);
     const lines = map.get('src/index.ts')!;
-    expect(lines.has(6)).toBe(true);
-    expect(lines.has(7)).toBe(true);
-    expect(lines.has(5)).toBe(false); // context line
-    expect(lines.has(8)).toBe(false); // context line after added
+    expect(lines.has(6)).toBe(true); // added line
+    expect(lines.has(7)).toBe(true); // added line
+    expect(lines.has(5)).toBe(true); // context line (visible in hunk)
+    expect(lines.has(8)).toBe(true); // context line after added (visible in hunk)
   });
 
   it('handles multiple files in one diff', () => {
@@ -400,8 +402,9 @@ deleted file mode 100644
     const map = extractDiffLineMap(diff);
     // Should not have spurious entries from --- or +++ lines
     const lines = map.get('a.ts')!;
-    expect(lines.size).toBe(1);
-    expect(lines.has(2)).toBe(true);
+    expect(lines.size).toBe(2); // 1 context + 1 added
+    expect(lines.has(1)).toBe(true); // context line
+    expect(lines.has(2)).toBe(true); // added line
   });
 
   it('handles multiple hunks in one file', () => {
@@ -421,13 +424,13 @@ deleted file mode 100644
 
     const map = extractDiffLineMap(diff);
     const lines = map.get('a.ts')!;
-    expect(lines.has(2)).toBe(true);
-    expect(lines.has(12)).toBe(true);
-    expect(lines.has(1)).toBe(false);
-    expect(lines.has(11)).toBe(false);
+    expect(lines.has(2)).toBe(true); // added
+    expect(lines.has(12)).toBe(true); // added
+    expect(lines.has(1)).toBe(true); // context (visible in hunk)
+    expect(lines.has(11)).toBe(true); // context (visible in hunk)
   });
 
-  it('does not count deleted lines as added', () => {
+  it('does not count deleted lines but includes context lines', () => {
     const diff = `diff --git a/a.ts b/a.ts
 --- a/a.ts
 +++ b/a.ts
@@ -438,7 +441,9 @@ deleted file mode 100644
 
     const map = extractDiffLineMap(diff);
     const lines = map.get('a.ts')!;
-    expect(lines.size).toBe(0); // no added lines
+    expect(lines.size).toBe(2); // 2 context lines, no added lines
+    expect(lines.has(1)).toBe(true); // context
+    expect(lines.has(2)).toBe(true); // context
   });
 
   it('correctly tracks line numbers with mixed add/delete/context', () => {
@@ -458,7 +463,10 @@ deleted file mode 100644
     const lines = map.get('a.ts')!;
     expect(lines.has(2)).toBe(true); // new2
     expect(lines.has(4)).toBe(true); // new4
-    expect(lines.size).toBe(2);
+    expect(lines.has(1)).toBe(true); // context
+    expect(lines.has(3)).toBe(true); // context
+    expect(lines.has(5)).toBe(true); // context
+    expect(lines.size).toBe(5); // 2 added + 3 context
   });
 
   it('handles diff with no hunks (binary file, etc.)', () => {

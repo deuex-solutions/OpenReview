@@ -41,8 +41,8 @@ describe('loadConfig', () => {
 
     expect(cfg.mainModel).toBe('gpt-4o');
     expect(cfg.subModel).toBe('gpt-4o-mini');
-    expect(cfg.maxIterations).toBe(20);
-    expect(cfg.maxLlmCalls).toBe(25);
+    expect(cfg.maxIterations).toBe(12);
+    expect(cfg.maxLlmCalls).toBe(35);
     expect(cfg.maxFiles).toBe(100);
     expect(cfg.maxFileBytes).toBe(200_000);
     expect(cfg.maxTotalBytes).toBe(5_000_000);
@@ -140,7 +140,7 @@ describe('loadConfig', () => {
 
     const cfg = loadConfig();
 
-    expect(cfg.maxIterations).toBe(20);
+    expect(cfg.maxIterations).toBe(12);
   });
 
   it('parses float values', () => {

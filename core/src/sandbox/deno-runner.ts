@@ -61,7 +61,7 @@ export async function verifyDenoInstallation(): Promise<string> {
 /*  Sandbox execution                                                  */
 /* ------------------------------------------------------------------ */
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 /**
  * Build a Deno script that injects `globals` as a top-level `const GLOBALS`
