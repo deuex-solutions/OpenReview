@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { createLLM, createMainLLM, createSubLLM, detectProvider } from '../../../core/src/llm/router.js';
+import {
+  createLLM,
+  createMainLLM,
+  createStructuredLLM,
+  createSubLLM,
+  detectProvider,
+} from '../../../core/src/llm/router.js';
 
 /* ------------------------------------------------------------------ */
 /*  detectProvider                                                     */
@@ -111,5 +117,28 @@ describe('createMainLLM / createSubLLM', () => {
     const llm = createSubLLM();
     expect(llm).toBeDefined();
     expect(typeof llm.invoke).toBe('function');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  createStructuredLLM                                                */
+/* ------------------------------------------------------------------ */
+
+describe('createStructuredLLM', () => {
+  it('creates a structured LLM for OpenAI models', async () => {
+    const { z } = await import('zod');
+    const schema = z.object({ name: z.string() });
+
+    const llm = createStructuredLLM('gpt-4o', schema, 'test_schema', 0);
+    expect(llm).toBeDefined();
+    expect(typeof llm.invoke).toBe('function');
+  });
+
+  it('creates a structured LLM with custom temperature', async () => {
+    const { z } = await import('zod');
+    const schema = z.object({ value: z.number() });
+
+    const llm = createStructuredLLM('gpt-4o', schema, 'test_schema', 0.5);
+    expect(llm).toBeDefined();
   });
 });

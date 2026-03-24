@@ -191,6 +191,51 @@ describe('GitHubClient', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Auth scheme detection                                              */
+/* ------------------------------------------------------------------ */
+
+describe('Auth scheme detection', () => {
+  it('uses token scheme for classic PATs (ghp_)', () => {
+    const spy = vi.spyOn(axios, 'create').mockReturnValue({
+      interceptors: { response: { use: vi.fn() }, request: { use: vi.fn() } },
+    } as unknown as AxiosInstance);
+
+    new GitHubClient({ token: 'ghp_abc123', owner: 'o', repo: 'r' });
+
+    const callArgs = spy.mock.calls[0][0];
+    expect(callArgs?.headers?.Authorization).toBe('token ghp_abc123');
+
+    vi.restoreAllMocks();
+  });
+
+  it('uses Bearer scheme for fine-grained PATs (github_pat_)', () => {
+    const spy = vi.spyOn(axios, 'create').mockReturnValue({
+      interceptors: { response: { use: vi.fn() }, request: { use: vi.fn() } },
+    } as unknown as AxiosInstance);
+
+    new GitHubClient({ token: 'github_pat_abc123', owner: 'o', repo: 'r' });
+
+    const callArgs = spy.mock.calls[0][0];
+    expect(callArgs?.headers?.Authorization).toBe('Bearer github_pat_abc123');
+
+    vi.restoreAllMocks();
+  });
+
+  it('uses Bearer scheme for OAuth tokens (gho_)', () => {
+    const spy = vi.spyOn(axios, 'create').mockReturnValue({
+      interceptors: { response: { use: vi.fn() }, request: { use: vi.fn() } },
+    } as unknown as AxiosInstance);
+
+    new GitHubClient({ token: 'gho_abc123', owner: 'o', repo: 'r' });
+
+    const callArgs = spy.mock.calls[0][0];
+    expect(callArgs?.headers?.Authorization).toBe('Bearer gho_abc123');
+
+    vi.restoreAllMocks();
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /*  Rate limit detection                                               */
 /* ------------------------------------------------------------------ */
 
@@ -210,5 +255,27 @@ describe('Rate limit interceptor', () => {
     expect(mockInstance.interceptors.response.use).toHaveBeenCalledTimes(3);
 
     vi.restoreAllMocks();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Static factory methods                                             */
+/* ------------------------------------------------------------------ */
+
+describe('Factory methods', () => {
+  it('fromPRUrl creates client from a valid PR URL', () => {
+    const { client, prNumber } = GitHubClient.fromPRUrl(
+      'https://github.com/acme/widget/pull/42',
+      'test-token',
+    );
+    expect(client.owner).toBe('acme');
+    expect(client.repo).toBe('widget');
+    expect(prNumber).toBe(42);
+  });
+
+  it('fromPRUrl throws on invalid URL', () => {
+    expect(() => GitHubClient.fromPRUrl('https://github.com/bad', 'tok')).toThrow(
+      'Invalid GitHub PR URL',
+    );
   });
 });
