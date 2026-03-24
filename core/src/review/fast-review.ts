@@ -381,16 +381,48 @@ function getAntiEmptyInstruction(fileType: DiffFileType): string {
 /*  Prompt construction                                                */
 /* ------------------------------------------------------------------ */
 
-function buildPrompt(
-  pr: PRContext,
-  linterFindings: ReviewFinding[],
-): Array<{ role: string; content: string }> {
-  const fileType = detectDiffFileType(pr.files);
+/** Threshold for using compact vs comprehensive prompt. */
+const SMALL_DIFF_THRESHOLD = 3000; // chars
+const SMALL_FILE_THRESHOLD = 5; // files
+
+/**
+ * Compact prompt for small PRs (≤ 5 files, ≤ 3000 char diff).
+ * Shorter and more focused — prevents the model from being overly conservative.
+ */
+function buildCompactPrompt(_pr: PRContext, fileType: DiffFileType): string[] {
+  const persona = getFileTypePersona(fileType);
+  const antiEmpty = getAntiEmptyInstruction(fileType);
+
+  return [
+    persona + ' Review this Pull Request diff and find bugs, security issues, and quality problems.',
+    '',
+    'Look for: logic errors, race conditions, missing error handling, security vulnerabilities,',
+    'type mismatches, missing dependency array items (React hooks), resource leaks, and bad practices.',
+    '',
+    'Respond with a JSON array. Each finding MUST have exactly these fields:',
+    '- category: "bug" or "flag"',
+    '- severity: "severe", "non-severe", "investigate", or "informational"',
+    '- file: file path',
+    '- startLine: line number',
+    '- endLine: line number',
+    '- title: short description',
+    '- explanation: detailed explanation',
+    '- suggestedFix: corrected code or null',
+    '',
+    'Do NOT use markdown code fences. Return raw JSON only.' + antiEmpty,
+  ];
+}
+
+/**
+ * Comprehensive prompt for large PRs (> 5 files or > 3000 char diff).
+ * Full category checklist for thorough coverage.
+ */
+function buildComprehensivePrompt(_pr: PRContext, fileType: DiffFileType): string[] {
   const persona = getFileTypePersona(fileType);
   const fileTypeInstructions = getFileTypeInstructions(fileType);
   const antiEmpty = getAntiEmptyInstruction(fileType);
 
-  const systemPrompt = [
+  return [
     persona + ' Your task is to thoroughly review a Pull Request diff and produce actionable findings.',
     '',
     '## What to look for',
@@ -432,39 +464,35 @@ function buildPrompt(
     '## Response format',
     'Respond ONLY with a valid JSON array of findings. Each finding MUST use these exact field names and values:',
     '',
-    '- **category**: MUST be `"bug"` or `"flag"` — no other values like "Documentation", "Security", etc.',
-    '- **severity**: MUST be `"severe"`, `"non-severe"`, `"investigate"`, or `"informational"` — no other values like "low", "high", "medium"',
+    '- **category**: MUST be `"bug"` or `"flag"` — no other values',
+    '- **severity**: MUST be `"severe"`, `"non-severe"`, `"investigate"`, or `"informational"`',
     '- **file**: file path relative to repo root',
     '- **startLine**: line number from the diff',
-    '- **endLine**: end line number (same as startLine for single-line)',
+    '- **endLine**: end line number',
     '- **title**: short title under 80 chars',
     '- **explanation**: detailed explanation',
     '- **suggestedFix**: corrected code or null',
     '',
-    '```json',
-    '[{',
-    '  "category": "bug",',
-    '  "severity": "non-severe",',
-    '  "file": "src/config.yaml",',
-    '  "startLine": 42,',
-    '  "endLine": 42,',
-    '  "title": "Missing required field in config",',
-    '  "explanation": "The enabled field is missing from the oidcConfiguration block, which will cause the auth provider to be silently disabled.",',
-    '  "suggestedFix": "oidcConfiguration:\\n  enabled: true"',
-    '}]',
-    '```',
-    '',
     '## Rules',
-    '- Only cite line numbers that are visible in the diff (added, modified, or context lines).',
-    '- Be thorough — it is better to flag a potential issue than to miss a real bug.',
-    '- For config/YAML/MDX files: check structure correctness, missing fields, inconsistencies between similar blocks.',
-    '- Classify documentation/config issues as category "flag" with severity "investigate" or "informational".',
-    '- If genuinely no issues are found, respond with an empty array: []',
-    '- Do NOT wrap the JSON in markdown code fences.',
+    '- Only cite line numbers visible in the diff.',
+    '- Be thorough — better to flag than to miss.',
+    '- If genuinely no issues, respond with: []',
+    '- Do NOT use markdown code fences.',
     '',
-    'CRITICAL: Use ONLY the exact enum values specified above for category and severity. Do NOT use values like "Documentation", "low", "high", "Security", etc.' +
-      antiEmpty,
+    'CRITICAL: Use ONLY the exact enum values above for category and severity.' + antiEmpty,
   ];
+}
+
+function buildPrompt(
+  pr: PRContext,
+  linterFindings: ReviewFinding[],
+): Array<{ role: string; content: string }> {
+  const fileType = detectDiffFileType(pr.files);
+  const isSmallDiff = pr.diff.length <= SMALL_DIFF_THRESHOLD && pr.files.length <= SMALL_FILE_THRESHOLD;
+
+  const systemPrompt = isSmallDiff
+    ? buildCompactPrompt(pr, fileType)
+    : buildComprehensivePrompt(pr, fileType);
 
   if (pr.instructions) {
     systemPrompt.push('', '## Project Review Instructions', pr.instructions);

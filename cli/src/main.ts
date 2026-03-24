@@ -19,6 +19,12 @@ registerAskCommand(program);
 registerServeCommand(program);
 registerTracesCommand(program);
 
+// Show help when no command is provided
+if (process.argv.length <= 2) {
+  program.outputHelp();
+  process.exit(0);
+}
+
 // Handle uncaught errors gracefully
 program.exitOverride();
 

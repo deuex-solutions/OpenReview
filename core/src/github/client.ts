@@ -85,7 +85,8 @@ function attachAuthErrorInterceptor(client: AxiosInstance): void {
       return Promise.reject(
         new Error(
           `GitHub API returned 404 for ${url}. ` +
-            'This usually means the repository is private and your token lacks access. ' +
+            'This can mean: (1) the PR or repository does not exist, ' +
+            '(2) the repository is private and your token lacks access. ' +
             'For private repos, ensure your GITHUB_PAT has the "repo" scope (classic PAT) ' +
             'or repository access (fine-grained PAT).',
         ),
