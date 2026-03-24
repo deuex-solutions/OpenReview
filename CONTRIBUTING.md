@@ -107,6 +107,12 @@ Open an issue on GitHub with:
 - Expected vs actual behavior
 - Node.js version, OS, and relevant environment details
 
+## Project Guidance Files
+
+- [CLAUDE.md](CLAUDE.md) — Architecture overview, commands, conventions for AI coding agents
+- [REVIEW.md](REVIEW.md) — OpenReview's own review rules (code style, architecture, testing, security)
+- [SETUP.md](SETUP.md) — Detailed setup guide with configuration reference and troubleshooting
+
 ## Code of Conduct
 
 This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.

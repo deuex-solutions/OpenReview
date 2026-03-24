@@ -15,10 +15,10 @@ These are OpenReview's own review rules, applied when reviewing this repository 
 - Business logic belongs in `core/` — `cli/` and `action/` are thin wrappers
 - GitHub API calls go through `core/src/github/client.ts`, never called directly elsewhere
 - LLM calls go through `core/src/llm/router.ts`, never instantiate models directly
-- All findings use the `ReviewFinding` interface — no ad-hoc finding formats
-- Impact analysis lives in `core/src/impact/` as a standalone module — integrated into the review pipeline via `core/src/review/`, same pattern as linter orchestration
-- Impact types (`ImpactNode`, `ImpactResult`, `ImpactGraph`) are defined in `core/src/impact/types.ts` and re-exported through `core/src/review/types.ts`
-- Tree-sitter parsers must guard against malformed AST nodes — always validate node type before accessing children
+- All findings use the `ReviewFinding` interface from `core/src/review/types.ts` — no ad-hoc finding formats
+- Large diffs are chunked by file boundary (~40K chars per chunk) — never send >100K to the LLM
+- Non-reviewable files (lock files, generated code, images) are filtered before LLM review
+- Structured LLM output via Zod schemas is preferred; raw text parsing is the fallback
 
 ## Error Handling
 

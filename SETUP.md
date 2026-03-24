@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: openreview/action@v1
+      - uses: deuex-solutions/OpenReview@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Set at least one LLM API key
@@ -256,7 +256,7 @@ LINTER_GITLEAKS=false
 ### Clone and install
 
 ```bash
-git clone https://github.com/openreview/openreview.git
+git clone https://github.com/deuex-solutions/OpenReview.git
 cd openreview
 pnpm install
 ```

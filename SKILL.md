@@ -23,10 +23,16 @@ npx openreview review --url <PR-URL> --mode rlm
 npx openreview review --url <PR-URL> --expert
 
 # Ask a codebase-aware question about a PR
-npx openreview ask --repo <path>
+npx openreview ask --url <PR-URL>
 
-# Output as JSON
-npx openreview review --url <PR-URL> --output json
+# Output as JSON (for CI/CD pipelines)
+npx openreview review --url <PR-URL> --output json --quiet
+
+# View past review traces
+npx openreview traces --list
+
+# Start API server
+npx openreview serve --port 3000
 ```
 
 ## Expert Mode (`--expert`)
