@@ -163,6 +163,21 @@ export async function runFastReview(
     }
   }
 
+  // Path D: If still empty on non-code files, retry with a focused re-prompt
+  const fileType = detectDiffFileType(pr.files);
+  if (aiFindings.length === 0 && fileType !== 'code') {
+    try {
+      const focusedPrompt = buildFocusedRetryPrompt(pr, fileType);
+      const retryFindings = await invokeRawWithParser(focusedPrompt, pr.files);
+      if (retryFindings.length > 0) {
+        aiFindings = retryFindings;
+        trace.path = (trace.path + '+focused-retry') as ReviewTrace['path'];
+      }
+    } catch {
+      // Best effort
+    }
+  }
+
   trace.rawFindingsCount = aiFindings.length;
 
   // 3. Validate citations with snap-to-nearest
@@ -250,6 +265,119 @@ async function invokeRawWithParser(
 }
 
 /* ------------------------------------------------------------------ */
+/*  File-type detection                                                */
+/* ------------------------------------------------------------------ */
+
+type DiffFileType = 'code' | 'config' | 'docs' | 'k8s' | 'mixed';
+
+function detectDiffFileType(files: string[]): DiffFileType {
+  const ext = (f: string) => {
+    const i = f.lastIndexOf('.');
+    return i >= 0 ? f.slice(i).toLowerCase() : '';
+  };
+
+  const configExts = new Set(['.yaml', '.yml', '.toml', '.json', '.env', '.ini', '.cfg', '.conf']);
+  const docsExts = new Set(['.md', '.mdx', '.rst', '.txt', '.adoc']);
+  const k8sPatterns = ['k8s', 'kubernetes', 'helm', 'deploy', 'manifest', 'kustomize'];
+
+  let configCount = 0;
+  let docsCount = 0;
+  let k8sCount = 0;
+  let codeCount = 0;
+
+  for (const f of files) {
+    const e = ext(f);
+    const lower = f.toLowerCase();
+
+    if (k8sPatterns.some((p) => lower.includes(p))) {
+      k8sCount++;
+    } else if (configExts.has(e)) {
+      configCount++;
+    } else if (docsExts.has(e)) {
+      docsCount++;
+    } else {
+      codeCount++;
+    }
+  }
+
+  const total = files.length;
+  if (total === 0) return 'code';
+  if (k8sCount > total / 2) return 'k8s';
+  if (configCount > total / 2) return 'config';
+  if (docsCount > total / 2) return 'docs';
+  if (codeCount > total / 2) return 'code';
+  return 'mixed';
+}
+
+function getFileTypePersona(fileType: DiffFileType): string {
+  switch (fileType) {
+    case 'k8s':
+      return 'You are OpenReview, a Kubernetes security auditor and infrastructure reviewer.';
+    case 'config':
+      return 'You are OpenReview, a configuration and infrastructure review specialist.';
+    case 'docs':
+      return 'You are OpenReview, a technical documentation reviewer focused on accuracy and completeness.';
+    default:
+      return 'You are OpenReview, an expert code reviewer.';
+  }
+}
+
+function getFileTypeInstructions(fileType: DiffFileType): string[] {
+  switch (fileType) {
+    case 'k8s':
+      return [
+        '',
+        '### Kubernetes / Infrastructure',
+        '- Missing resource limits/requests (CPU, memory)',
+        '- Security: privileged containers, runAsRoot, overly permissive RBAC',
+        '- Deprecated API versions (extensions/v1beta1, etc.)',
+        '- Missing liveness/readiness probes',
+        '- Missing labels or selectors that don\'t match',
+        '- Hardcoded environment-specific values that should be templated',
+        '- Inconsistencies between similar deployment/service configs',
+      ];
+    case 'config':
+      return [
+        '',
+        '### Configuration Files (YAML/JSON/TOML)',
+        '- Structural correctness: invalid nesting, wrong indentation, duplicate keys',
+        '- Missing required fields (e.g., enabled flags, connection strings)',
+        '- Inconsistencies between similar config blocks (e.g., staging vs prod drift)',
+        '- Typos in field names (e.g., "replcias" instead of "replicas")',
+        '- Wrong value types (string where number expected, etc.)',
+        '- Hardcoded secrets or environment-specific values',
+        '- Changes that could break dependent systems',
+      ];
+    case 'docs':
+      return [
+        '',
+        '### Documentation (Markdown/MDX)',
+        '- Code examples that may be incorrect or contradict the actual codebase',
+        '- Broken internal links or references to renamed/removed files',
+        '- Outdated version numbers, dependency references, or API endpoints',
+        '- Missing sections in structured docs (parameters, examples, return values)',
+        '- Factual inaccuracies about the system\'s behavior',
+        '- Unclear or ambiguous instructions that could mislead users',
+      ];
+    default:
+      return [];
+  }
+}
+
+function getAntiEmptyInstruction(fileType: DiffFileType): string {
+  if (fileType === 'code' || fileType === 'mixed') return '';
+
+  return (
+    '\n\nIMPORTANT: This PR modifies ' +
+    (fileType === 'k8s' ? 'Kubernetes/infrastructure' : fileType === 'config' ? 'configuration' : 'documentation') +
+    ' files. Config and documentation errors cause production outages and user confusion ' +
+    'just like code bugs. You MUST provide at least one finding — even if it is an ' +
+    '"informational" finding confirming the structure is valid and noting implications of the change. ' +
+    'An empty array is NOT acceptable for non-code changes.'
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Prompt construction                                                */
 /* ------------------------------------------------------------------ */
 
@@ -257,8 +385,13 @@ function buildPrompt(
   pr: PRContext,
   linterFindings: ReviewFinding[],
 ): Array<{ role: string; content: string }> {
+  const fileType = detectDiffFileType(pr.files);
+  const persona = getFileTypePersona(fileType);
+  const fileTypeInstructions = getFileTypeInstructions(fileType);
+  const antiEmpty = getAntiEmptyInstruction(fileType);
+
   const systemPrompt = [
-    'You are OpenReview, an expert code reviewer. Your task is to thoroughly review a Pull Request diff and produce actionable findings.',
+    persona + ' Your task is to thoroughly review a Pull Request diff and produce actionable findings.',
     '',
     '## What to look for',
     'You MUST check every changed line for ALL of the following categories:',
@@ -294,6 +427,7 @@ function buildPrompt(
     '- Deprecated API usage',
     '- Missing edge case handling (empty arrays, null inputs, boundary values)',
     '- Inconsistent patterns within the same codebase',
+    ...fileTypeInstructions,
     '',
     '## Response format',
     'Respond ONLY with a valid JSON array of findings. Each finding MUST use these exact field names and values:',
@@ -328,7 +462,8 @@ function buildPrompt(
     '- If genuinely no issues are found, respond with an empty array: []',
     '- Do NOT wrap the JSON in markdown code fences.',
     '',
-    'CRITICAL: Use ONLY the exact enum values specified above for category and severity. Do NOT use values like "Documentation", "low", "high", "Security", etc.',
+    'CRITICAL: Use ONLY the exact enum values specified above for category and severity. Do NOT use values like "Documentation", "low", "high", "Security", etc.' +
+      antiEmpty,
   ];
 
   if (pr.instructions) {
@@ -371,6 +506,49 @@ function buildPrompt(
   return [
     { role: 'system', content: systemPrompt.join('\n') },
     { role: 'human', content: humanContent.join('\n') },
+  ];
+}
+
+/**
+ * Build a focused retry prompt for non-code files when the initial review returns empty.
+ * Uses a file-type-specific persona and forces at least one informational finding.
+ */
+function buildFocusedRetryPrompt(
+  pr: PRContext,
+  fileType: DiffFileType,
+): Array<{ role: string; content: string }> {
+  const persona = getFileTypePersona(fileType);
+  const typeLabel =
+    fileType === 'k8s'
+      ? 'Kubernetes/infrastructure manifests'
+      : fileType === 'config'
+        ? 'configuration files'
+        : 'documentation files';
+
+  return [
+    {
+      role: 'system',
+      content: [
+        persona,
+        '',
+        `This PR modifies ${typeLabel}. You MUST find and report issues.`,
+        '',
+        'For each changed file, check:',
+        ...getFileTypeInstructions(fileType),
+        '',
+        'Respond with a JSON array. Use category: "bug" or "flag". Use severity: "severe", "non-severe", "investigate", or "informational".',
+        'Include file, startLine, endLine, title, explanation, suggestedFix (or null).',
+        '',
+        'You MUST return at least one finding. If no bugs exist, return at least one "informational" finding',
+        'summarizing what the change does and any implications or risks.',
+        'Do NOT return an empty array.',
+        'Do NOT use markdown code fences.',
+      ].join('\n'),
+    },
+    {
+      role: 'human',
+      content: `## PR: ${pr.metadata.title}\n\n### Diff\n\`\`\`diff\n${pr.diff}\n\`\`\``,
+    },
   ];
 }
 

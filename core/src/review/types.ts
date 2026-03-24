@@ -51,7 +51,7 @@ export interface ReviewTrace {
   droppedByCitation: Array<{ file: string; lines: string; title: string }>;
   finalFindingsCount: number;
   emptyReason?: 'llm_returned_empty' | 'all_filtered_by_citation' | 'structured_and_fallback_empty';
-  path: 'structured' | 'fallback' | 'structured+fallback';
+  path: string;
   durationMs: number;
 }
 
