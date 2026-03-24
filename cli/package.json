@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "type": "module",
   "bin": {
-    "openreview": "dist/index.js"
+    "openreview": "dist/main.mjs"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/main.mjs",
+  "types": "dist/main.d.mts",
   "scripts": {
     "build": "tsdown src/main.ts --format esm --dts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@openreview/core": "workspace:*"
+    "@openreview/core": "workspace:*",
+    "commander": "^13.1.0"
   }
 }

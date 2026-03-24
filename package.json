@@ -1,5 +1,5 @@
 {
-  "name": "openreview",
+  "name": "openreview-monorepo",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -20,6 +20,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "openreview": "workspace:*",
     "@eslint/js": "^10.0.1",
     "@langchain/anthropic": "^0.3.34",
     "@langchain/core": "^0.3.80",

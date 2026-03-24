@@ -4,6 +4,33 @@ import axios from 'axios';
 import { config } from '../config/env.js';
 
 /* ------------------------------------------------------------------ */
+/*  Errors                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * GitHub returns HTTP 404 for missing resources and also when the caller is
+ * not allowed to see a private repo (so existence is not leaked). Surface a
+ * clearer message than axios's generic "Request failed with status code 404".
+ */
+function enhanceNotFoundError(
+  err: unknown,
+  operation: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+): never {
+  if (axios.isAxiosError(err) && err.response?.status === 404) {
+    throw new Error(
+      `GitHub API returned 404 while ${operation} for ${owner}/${repo} pull request #${prNumber}. ` +
+        'That usually means the PR or repo does not exist, or the repository is private and your token cannot access it. ' +
+        'For a fine-grained personal access token, add this repository under "Repository access" and grant at least Pull requests (Read) and Contents (Read). ' +
+        'For a classic token, enable the "repo" scope for private repositories.',
+    );
+  }
+  throw err;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -134,17 +161,21 @@ export class GitHubClient {
   /* ---- PR metadata ---- */
 
   async getPR(prNumber: number): Promise<PRMetadata> {
-    const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/pulls/${prNumber}`);
-    return {
-      number: data.number,
-      title: data.title,
-      body: data.body ?? '',
-      state: data.state,
-      draft: data.draft ?? false,
-      head: { sha: data.head.sha, ref: data.head.ref },
-      base: { sha: data.base.sha, ref: data.base.ref },
-      user: { login: data.user.login },
-    };
+    try {
+      const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/pulls/${prNumber}`);
+      return {
+        number: data.number,
+        title: data.title,
+        body: data.body ?? '',
+        state: data.state,
+        draft: data.draft ?? false,
+        head: { sha: data.head.sha, ref: data.head.ref },
+        base: { sha: data.base.sha, ref: data.base.ref },
+        user: { login: data.user.login },
+      };
+    } catch (e) {
+      enhanceNotFoundError(e, 'fetching PR metadata', this.owner, this.repo, prNumber);
+    }
   }
 
   /* ---- PR files (paginated) ---- */
@@ -182,10 +213,14 @@ export class GitHubClient {
   /* ---- Raw diff ---- */
 
   async getPRDiff(prNumber: number): Promise<string> {
-    const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/pulls/${prNumber}`, {
-      headers: { Accept: 'application/vnd.github.v3.diff' },
-    });
-    return data as string;
+    try {
+      const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/pulls/${prNumber}`, {
+        headers: { Accept: 'application/vnd.github.v3.diff' },
+      });
+      return data as string;
+    } catch (e) {
+      enhanceNotFoundError(e, 'fetching the PR diff', this.owner, this.repo, prNumber);
+    }
   }
 
   /* ---- File content at ref ---- */

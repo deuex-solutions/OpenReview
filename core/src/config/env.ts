@@ -104,7 +104,7 @@ export function loadConfig(): OpenReviewConfig {
     subModel: envString('SUB_MODEL', 'gpt-4o-mini'),
 
     maxIterations: envInt('MAX_ITERATIONS', 20),
-    maxLlmCalls: envInt('MAX_LLM_CALLS', 25),
+    maxLlmCalls: envInt('MAX_LLM_CALLS', 250),
     maxFiles: envInt('MAX_FILES', 100),
     maxFileBytes: envInt('MAX_FILE_BYTES', 200_000),
     maxTotalBytes: envInt('MAX_TOTAL_BYTES', 5_000_000),
