@@ -22,3 +22,4 @@ Thumbs.db
 # OpenMemory - IDE/Assistant specific rules
 .cursor/rules/openmemory.mdc
 CLAUDE.md
+coverage/
