@@ -298,6 +298,9 @@ node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123 --exp
 
 # JSON output for scripting
 node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123 --output json --quiet
+
+# Post findings directly as GitHub PR comments
+node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123 --submit
 ```
 
 ### Step 6: Explore other commands

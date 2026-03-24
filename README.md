@@ -60,6 +60,9 @@ npx openreview review --url https://github.com/owner/repo/pull/123 --expert
 # Output as JSON (for CI/CD integration)
 npx openreview review --url <PR-URL> --output json --quiet
 
+# Post findings directly as GitHub PR comments
+npx openreview review --url <PR-URL> --submit
+
 # Ask questions about a PR interactively
 npx openreview ask --url https://github.com/owner/repo/pull/123
 
@@ -95,6 +98,7 @@ npx openreview review --url <PR-URL> [options]
 | `--output <fmt>` | `text`   | Output format: `text`, `markdown`, or `json`       |
 | `--model <id>`   | —        | Override the LLM model at runtime                  |
 | `--expert`       | off      | Comprehensive SOLID, security, and quality review  |
+| `--submit`       | off      | Post findings as GitHub PR comment (inline + summary) |
 | `--quiet`        | off      | Suppress progress output (only print findings)     |
 
 **Expert mode** (`--expert`) adds deep analysis covering:

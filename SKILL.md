@@ -25,6 +25,9 @@ npx openreview review --url <PR-URL> --expert
 # Ask a codebase-aware question about a PR
 npx openreview ask --url <PR-URL>
 
+# Post findings as GitHub PR comments
+npx openreview review --url <PR-URL> --submit
+
 # Output as JSON (for CI/CD pipelines)
 npx openreview review --url <PR-URL> --output json --quiet
 

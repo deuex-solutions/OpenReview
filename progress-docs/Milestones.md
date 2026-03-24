@@ -93,7 +93,12 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 - ✅ `CONTRIBUTING.md` — Setup, workflow, conventions, PR process
 - ✅ QA: 321 tests, 10/10 test PR bugs caught (18 findings), CLI E2E verified (fast + RLM)
 - ✅ Bug fixes from manual testing: auth scheme detection, structured output, severity normalization, file-type-aware prompting, sandbox `deno run`, RLM recursion limit, temperature control
-- [ ] `--submit` flag: post CLI review findings as GitHub PR comment (pre-launch gap closure)
+- ✅ `--submit` flag: post CLI review findings as GitHub PR comment — E2E tested on real PR (inline + summary)
+- ✅ Chunked diff review for large PRs (40K char chunks, lock file filtering, file-type-aware prompting)
+- ✅ Adaptive prompt length (compact for small PRs, comprehensive for large)
+- ✅ Competitive analysis with AsyncReview — roadmap updated with 3 gap-closure features
+- ✅ GETTING_STARTED.md — comprehensive 3-path onboarding guide
+- ✅ Documentation audit and update across all user-facing files
 - [ ] Launch checklist: npm publish, GitHub Marketplace, public announcement (deferred)
 
 #### Week 5–6 — Impact Analysis (Phase 1 MVP)

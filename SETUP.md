@@ -82,6 +82,12 @@ npx openreview review --url https://github.com/owner/repo/pull/123 --output json
 
 # Expert mode (SOLID + security + quality deep review)
 npx openreview review --url https://github.com/owner/repo/pull/123 --expert
+
+# Post findings directly as GitHub PR comments
+npx openreview review --url https://github.com/owner/repo/pull/123 --submit
+
+# Combine: expert review + post to GitHub + JSON output
+npx openreview review --url https://github.com/owner/repo/pull/123 --expert --submit --output json
 ```
 
 ---

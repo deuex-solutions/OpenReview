@@ -37,6 +37,19 @@ npx vitest run core/src/config/env.test.ts       # single file
 pnpm test:watch                                  # watch mode
 ```
 
+### Manual E2E Testing
+
+```bash
+# Review a real PR (fast mode)
+GITHUB_TOKEN=ghp_xxx node cli/dist/main.mjs review --url <PR-URL> --output text
+
+# Review + post findings to GitHub
+GITHUB_TOKEN=ghp_xxx node cli/dist/main.mjs review --url <PR-URL> --submit
+
+# Run the 10-PR QA suite
+node tests/qa/test-10-prs.mjs
+```
+
 ### Lint & Format
 
 ```bash

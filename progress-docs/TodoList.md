@@ -420,15 +420,16 @@
 
 ---
 
-## 14.5 Pre-Launch Feature Gap Closure
+## 14.5 Pre-Launch Feature Gap Closure ✅ COMPLETE (2026-03-24)
 
 ### 14.5.1 `--submit` Flag (Post findings as GitHub comment from CLI)
 
-- [ ] Add `--submit` flag to `cli/src/commands/review.ts`
-- [ ] When `--submit` is set: after review, call `CommentPoster.postReview()` + `CommentPoster.postSummaryComment()`
-- [ ] Require `GITHUB_TOKEN` or `GITHUB_PAT` when `--submit` is used
-- [ ] Print confirmation: "Review posted as comment on PR #X"
-- [ ] Skip posting if 0 findings (just post summary)
+- [x] Add `--submit` flag to `cli/src/commands/review.ts`
+- [x] When `--submit` is set: after review, call `CommentPoster.postReview()` + `CommentPoster.postSummaryComment()`
+- [x] Require `GITHUB_TOKEN` or `GITHUB_PAT` when `--submit` is used
+- [x] Print confirmation: "✅ Review posted on PR #X (N findings)"
+- [x] Skip posting inline if 0 findings (still posts summary)
+- [x] E2E tested on PR #7: 3 inline comments on correct lines, summary with replace-not-duplicate
 
 ---
 
