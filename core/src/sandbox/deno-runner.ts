@@ -1,4 +1,8 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -73,9 +77,17 @@ function buildScript(code: string, globals: Record<string, unknown>): string {
 }
 
 /**
- * Execute arbitrary code inside a Deno sandbox with strict permissions:
- * - `--allow-read` only (no network, no write, no env)
- * - Hard timeout via AbortController
+ * Execute arbitrary code inside a Deno sandbox with strict permissions.
+ *
+ * Uses `deno run` with a temp file (not `deno eval`) because `deno eval`
+ * has implicit all-permissions and doesn't support --deny-* flags.
+ *
+ * Permissions:
+ * - `--allow-read` only (for reading the temp script file)
+ * - `--deny-net` (no network)
+ * - `--deny-write` (no file writes)
+ * - `--deny-env` (no environment variable access)
+ * - `--deny-run` (no subprocess spawning)
  *
  * `globals` are injected as `GLOBALS` constant available in user code.
  */
@@ -87,6 +99,14 @@ export async function executeSandboxed(
   const script = buildScript(code, globals);
   const start = Date.now();
 
+  // Write script to a temp file (deno run requires a file path)
+  const sandboxDir = join(tmpdir(), 'openreview-sandbox');
+  if (!existsSync(sandboxDir)) {
+    mkdirSync(sandboxDir, { recursive: true });
+  }
+  const scriptPath = join(sandboxDir, `sandbox-${randomUUID().slice(0, 8)}.ts`);
+  writeFileSync(scriptPath, script, 'utf-8');
+
   return new Promise((resolve) => {
     const controller = new AbortController();
 
@@ -97,14 +117,13 @@ export async function executeSandboxed(
     execFile(
       'deno',
       [
-        'eval',
+        'run',
         '--ext=ts',
-        '--allow-read',
+        `--allow-read=${scriptPath}`,
         '--deny-net',
-        '--deny-write',
         '--deny-env',
         '--deny-run',
-        script,
+        scriptPath,
       ],
       {
         signal: controller.signal,
@@ -115,12 +134,18 @@ export async function executeSandboxed(
           PATH: process.env.PATH ?? '',
           HOME: process.env.HOME ?? '',
           DENO_DIR: process.env.DENO_DIR ?? '',
-          // Deno permission flags via env are not used — we rely on CLI flags
         },
       },
       (error, stdout, stderr) => {
         clearTimeout(timeout);
         const duration = Date.now() - start;
+
+        // Clean up temp file (best-effort)
+        try {
+          unlinkSync(scriptPath);
+        } catch {
+          // Ignore cleanup errors
+        }
 
         if (error && controller.signal.aborted) {
           resolve({
