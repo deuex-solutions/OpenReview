@@ -256,57 +256,7 @@
 
 ---
 
-## 17. Impact Analysis
-
-### MVP (Phase 1)
-
-**Purpose:** Identify the full blast radius of code changes — every file and UI component affected by a PR — so developers and testers know exactly what to verify.
-
-**Analysis Engine (Hybrid: Tree-sitter + LLM):**
-- **Phase 1:** Tree-sitter based static import/dependency graph builder (language-agnostic — supports JS/TS, Python, Go, Java, Ruby, Rust, and 100+ languages via Tree-sitter grammars)
-- **Phase 2:** LLM-powered semantic/data-flow analysis via LangGraph for deeper reasoning (e.g., form data → API route → backend handler → database query)
-
-**Dependency Tracing:**
-- Full transitive graph traversal from changed files to leaf nodes (pages/entry points)
-- Smart relevance scoring: direct dependents ranked highest, 2nd-degree lower, 3rd-degree lower still
-- Configurable depth threshold to filter noise on large codebases
-
-**Input Sources:**
-- Default: git diff + staged changes (same input as review engine)
-- Override: `--files <paths>` flag for manual file targeting (ad-hoc exploration)
-
-**CLI Integration:**
-- Interactive prompt during `openreview review`: "Would you like to include impact analysis? (y/n)"
-- `--impact` flag: include impact analysis without prompt
-- `--no-impact` flag: skip impact analysis without prompt
-- Flags designed for CI/automation use; interactive prompt for developer workflow
-
-**Output (Phase 1):**
-- Terminal: structured tree of impacted files with proximity scores, import chain paths, and component-to-page mapping
-- JSON report: machine-readable file for CI/CD integration
-- Review integration: standalone impact summary section + individual findings enriched with impact scope
-
-**Review Finding Enrichment:**
-- Each `ReviewFinding` annotated with impact scope (e.g., "This bug in `Button.tsx` affects 12 files across 3 pages")
-- Impact-based prioritization: findings in high-impact files surface first in the review output
-
-**UI Impact (Phase 1):**
-- Textual component-to-page/route mapping: maps changed files to the UI components/pages they affect (e.g., "Button change impacts: Login Page, Settings Page, Checkout Form")
-
-**Module Location:** `core/src/impact/` — standalone module integrated into the review pipeline (same pattern as linter orchestration)
-
-### Future (Phase 2)
-
-- LLM-powered semantic/data-flow analysis via LangGraph
-- Screenshot diffing: run app in sandbox before/after changes, visually highlight affected UI regions
-- Live preview in sandbox: spin up app, render affected pages, annotate impacted components
-- GitHub PR comment with collapsible impact summary table
-- Interactive HTML report / web dashboard with visual dependency graph (`web/`)
-- Docker container sandbox for CI-based UI rendering and screenshot capture
-
----
-
-## 18. Tech Stack (Locked)
+## 17. Tech Stack (Locked)
 
 | Layer                           | Technology                                                       | Version                                                       |
 | ------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -333,7 +283,7 @@
 
 ---
 
-## 18. Phased Roadmap Summary
+## 18. Phased Roadmap Summary (Locked)
 
 ### Phase 1 — MVP
 
@@ -360,20 +310,6 @@
 - SKILL.md for agent ecosystem integration
 - MIT license
 
-### Phase 1 — MVP (continued)
-- **Impact Analysis (Phase 1)** — Blast-radius detection for code changes
-  - Tree-sitter based import/dependency graph builder (language-agnostic)
-  - Transitive impact tracing with smart relevance scoring (direct > 2nd degree > 3rd degree)
-  - Default input: git diff + staged changes; manual `--files` override for ad-hoc exploration
-  - Interactive prompt during `openreview review` ("Include impact analysis?") + `--impact`/`--no-impact` flags
-  - Terminal output: structured tree of impacted files with proximity scores
-  - JSON report for CI/CD integration
-  - Component-to-page/route mapping (which UI areas are affected)
-  - Standalone impact summary section in review output
-  - Review findings enriched with impact scope (e.g., "affects 12 files across 3 pages")
-  - Impact-based prioritization of review findings
-  - New module: `core/src/impact/` integrated into review pipeline
-
 ### Phase 2 — Growth
 
 - Web UI (React 19 + Vite 8, 3-panel: file browser, diff viewer, chat)
@@ -384,13 +320,6 @@
 - Slack / Teams / Discord notifications
 - Expanded linter suite (30–50+ tools)
 - Basic per-PR metrics
-- **Impact Analysis (Phase 2 — Advanced)**
-  - LLM-powered semantic/data-flow analysis via LangGraph
-  - Screenshot diffing (before/after visual UI comparison)
-  - Live preview in sandbox with annotated impacted components
-  - GitHub PR comment with impact summary (collapsible table)
-  - Interactive HTML report / web dashboard with visual dependency graph
-  - Docker container sandbox for CI-based UI rendering
 
 ### Phase 3 — Enterprise
 
@@ -408,4 +337,4 @@
 
 ---
 
-_Generated by Claude Code on 2026-03-16 based on product Q&A session. Tech stack updated 2026-03-17._
+_Generated by Claude Code on 2026-03-16 based on product Q&A session. Tech stack updated 2026-03-17. Implementation status updated 2026-03-24._

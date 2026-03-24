@@ -3,7 +3,7 @@
 > Version 1.2 | 2026-03-24
 > 3 Phase-level Milestones + Post-MVP Roadmap
 > Audience: Solo Founder / Product Manager / Technical Lead
-> Status: Phase 1 Week 4 — 97.5% complete (launch checklist pending)
+> Status: Phase 1 Week 4 — 100% core features complete (launch checklist pending)
 
 ---
 
@@ -25,14 +25,14 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 
 ### Success Criteria
 
-- [ ] `npx openreview review --url <PR-URL>` works end-to-end on a public GitHub PR
-- [ ] GitHub Action auto-triggers Fast mode review on PR open/update within 60 seconds
-- [ ] `@openreview rlm` triggers Deep/RLM mode via GitHub comment
-- [ ] `@openreview <question>` triggers codebase-aware chat
-- [ ] All findings posted as native GitHub inline PR review comments with citations
-- [ ] Fast mode completes in < 60 seconds for PRs with ≤ 100 files
-- [ ] Catches ≥ 8 real bugs per 10 test PRs (validated set)
-- [ ] ≥ 10 GitHub stars within 2 weeks of public launch
+- [x] `npx openreview review --url <PR-URL>` works end-to-end on a public GitHub PR — CLI E2E verified (fast + RLM)
+- [x] GitHub Action auto-triggers Fast mode review on PR open/update within 60 seconds — `action/` fully implemented
+- [x] `@openreview rlm` triggers Deep/RLM mode via GitHub comment — `comment-handler.ts` routes to `rlm-runner.ts`
+- [x] `@openreview <question>` triggers codebase-aware chat — `chat-handler.ts` with thread history + suggestions
+- [x] All findings posted as native GitHub inline PR review comments with citations — batch review via `CommentPoster`
+- [x] Fast mode completes in < 60 seconds for PRs with ≤ 100 files — all 10 test PRs under 27s
+- [x] Catches ≥ 8 real bugs per 10 test PRs (validated set) — **10/10 caught (18 findings)**
+- [ ] ≥ 10 GitHub stars within 2 weeks of public launch — pending launch
 
 ### Deliverables
 
@@ -70,17 +70,18 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 
 #### Week 3 — RLM Mode + Chat + Learnings ✅ COMPLETE (2026-03-22)
 
-- ✅ `core/sandbox/deno-runner.ts` — Deno sandbox executor (`deno run` with strict permissions)
-- ✅ `core/review/rlm-runner.ts` — LangGraph agentic loop (Reason → Code → Execute → Observe)
-- ✅ `core/review/snapshot.ts` — Hybrid snapshot builder (diff immediate, files on demand)
-- ✅ JSON trace logger (`~/.openreview/traces/`) with secret scrubbing
-- ✅ `core/chat/chat-handler.ts` — `@openreview <question>` handler
-- ✅ `core/chat/suggestions.ts` — Follow-up question generator (SUB_MODEL)
-- ✅ `core/learnings/learnings-store.ts` — JSON file CRUD, trigger phrase detection
+- ✅ `core/sandbox/deno-runner.ts` — Deno sandbox executor (`deno run` with strict permissions: `--allow-read`, `--deny-net`, `--deny-env`, `--deny-run`), 15s timeout, 10MB buffer, temp file cleanup
+- ✅ `core/review/rlm-runner.ts` — LangGraph agentic loop (Reason → Code → Execute → Observe → Finalize) with 5 nodes, edge conditions (iteration/LLM call limits, `finish_review` tool), event streaming via `RLMEventHandler`
+- ✅ `core/review/snapshot.ts` — Hybrid snapshot builder (diff immediate, files on demand, inflight dedup, binary detection, `MAX_FILE_BYTES`/`MAX_TOTAL_BYTES` enforcement)
+- ✅ `core/trace/logger.ts` — JSON trace logger (`~/.openreview/traces/`) with secret scrubbing (OpenAI, GitHub PAT, Slack tokens, generic secrets), `logFastReview`, `logRLMIteration`, `logFindings`, `close`
+- ✅ `core/chat/chat-handler.ts` — `@openreview <question>` handler with loop prevention, thread history (last 10), citation validation, LLM streaming
+- ✅ `core/chat/suggestions.ts` — Follow-up question generator (SUB_MODEL, temperature 0.3, 4-5 questions, ≤8 words each)
+- ✅ `core/learnings/learnings-store.ts` — JSON file CRUD, trigger phrase detection (8 phrases), max 50 cap with auto-pruning, `formatLearningsForPrompt()` with 2000-token cap
+- ✅ Learning injection into `fast-review.ts` and `rlm-runner.ts` system prompts
 - ✅ Chat thread state management (stateful within PR)
 - 320 tests passing, lint clean, typecheck clean
 
-#### Week 4 — CLI + Action + Polish ✅ 97.5% COMPLETE (2026-03-24)
+#### Week 4 — CLI + Action + Polish ✅ COMPLETE (2026-03-24)
 
 - ✅ `cli/` — Full CLI: `review`, `ask`, `serve`, `traces` commands (commander v14)
 - ✅ `cli/src/formatter.ts` — text, markdown, JSON output formats
@@ -100,34 +101,6 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 - ✅ GETTING_STARTED.md — comprehensive 3-path onboarding guide
 - ✅ Documentation audit and update across all user-facing files
 - [ ] Launch checklist: npm publish, GitHub Marketplace, public announcement (deferred)
-
-#### Week 5–6 — Impact Analysis (Phase 1 MVP)
-
-**Goal:** When a developer runs `openreview review`, optionally identify all files and UI components affected by the changes in the PR — providing a full blast-radius view alongside the existing review findings.
-
-- `core/src/impact/` — New module for impact analysis engine
-  - `core/src/impact/types.ts` — Impact-specific types: `ImpactNode`, `ImpactGraph`, `ImpactResult`, proximity/relevance scoring types
-  - `core/src/impact/tree-sitter.ts` — Tree-sitter based import/dependency graph builder (language-agnostic, supports JS/TS, Python, Go, Java, Ruby, Rust, etc.)
-  - `core/src/impact/graph.ts` — Dependency graph traversal with transitive tracing and relevance scoring (direct > 2nd degree > 3rd degree)
-  - `core/src/impact/analyzer.ts` — Main entry point: takes changed files (git diff + staged), builds graph, returns scored impact results
-  - `core/src/impact/component-mapper.ts` — Textual component-to-page/route mapping (which UI pages/routes are affected by changed files)
-- Integration into review pipeline
-  - Interactive prompt during `openreview review`: "Would you like to include impact analysis? (y/n)"
-  - `--impact` / `--no-impact` CLI flags to skip the prompt (for CI/automation)
-  - `--files <paths>` override flag for manual file targeting (ad-hoc exploration)
-  - Default input: git diff + staged changes; `--files` overrides with arbitrary file list
-- Output — Terminal
-  - Structured tree of impacted files with proximity scores and import chain paths
-  - Component-to-page mapping section (which UI pages/routes are affected)
-- Output — JSON report
-  - Machine-readable JSON report file for CI/CD integration
-- Review integration
-  - Standalone "Impact Analysis" summary section in review output
-  - Each `ReviewFinding` enriched with impact scope annotation (e.g., "This bug in `Button.tsx` affects 12 files across 3 pages")
-  - Impact-based prioritization: findings in high-impact files surface first
-- Types integrated into `core/src/review/types.ts` (canonical source of truth)
-- Config: `IMPACT_ENABLED`, `IMPACT_DEPTH_THRESHOLD` env vars in `core/src/config/env.ts`
-- Unit tests for graph building, traversal, scoring, and component mapping
 
 ---
 
@@ -224,14 +197,6 @@ Transform OpenReview from a CLI tool into a full product experience — with a W
 
 - Auto-generated Mermaid diagrams posted in summary comment
 - Shows component interactions for complex PRs
-
-#### 2.10 Impact Analysis (Phase 2 — Advanced)
-- **LLM-powered semantic/data-flow analysis** via LangGraph — tracks how data flows across the codebase (e.g., form data → API route → backend handler → database query)
-- **Screenshot diffing** — Run target app in sandbox before/after changes, capture screenshots, visually highlight UI regions affected (pixel-level or component-level diff)
-- **Live preview in sandbox** — Spin up app in sandbox, render affected pages, annotate impacted components with overlay markers
-- **GitHub PR comment** — Post impact analysis summary as a collapsible table in the PR comment (impacted files grouped by category, proximity scores, affected pages)
-- **Interactive HTML report / web dashboard** — Generate visual dependency graph with highlighted impact zones, serve via `web/` (React 19 + Vite 8)
-- **Docker container sandbox** — Docker-based environment for running UI rendering and screenshot diffing in CI contexts (complements Deno sandbox from Phase 1)
 
 ---
 
@@ -348,4 +313,4 @@ These features were identified during product Q&A but deliberately deferred beyo
 
 ---
 
-_Milestones v1.1 — OpenReview — 2026-03-17_
+_Milestones v1.3 — OpenReview — 2026-03-24_

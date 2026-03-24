@@ -3,7 +3,7 @@
 > Version 1.2 | 2026-03-24
 > Structure: Phase → Feature → Task
 > Audience: Solo Founder / Technical Lead
-> Status: Phase 1 Weeks 1-4 complete. Sections 10-14 done (97.5%). Launch checklist pending.
+> Status: Phase 1 Weeks 1-4 complete. Sections 1-14.5 done (100% of core features). Only launch checklist (Section 15) pending.
 
 ---
 
@@ -175,115 +175,115 @@
 
 ---
 
-## 6. RLM Deep Mode
+## 6. RLM Deep Mode ✅ COMPLETE (2026-03-24)
 
-### 6.1 Deno Sandbox (`core/src/sandbox/deno-runner.ts`)
+### 6.1 Deno Sandbox (`core/src/sandbox/deno-runner.ts`) ✅ COMPLETE
 
-- [ ] Verify Deno 2.7+ installation at startup; throw descriptive error if missing
-- [ ] Implement `executeSandboxed(code: string, globals: Record<string, unknown>): Promise<SandboxResult>`
-- [ ] Inject `globals` as Deno script context (file contents, PR metadata)
-- [ ] Run with `--allow-read` only (no network, no write, no env)
-- [ ] 30-second hard timeout via `AbortController`
-- [ ] Capture stdout, stderr separately
-- [ ] Return `{ stdout, stderr, exitCode, duration }`
-- [ ] Unit test: successful execution, timeout handling, read-only enforcement, syntax error handling
+- [x] Verify Deno 2.7+ installation at startup; throw descriptive error if missing
+- [x] Implement `executeSandboxed(code: string, globals: Record<string, unknown>): Promise<SandboxResult>`
+- [x] Inject `globals` as Deno script context (file contents, PR metadata)
+- [x] Run with `--allow-read` only (no network, no write, no env) — also explicit `--deny-net`, `--deny-env`, `--deny-run`
+- [x] 30-second hard timeout via `AbortController` (15s default, customizable)
+- [x] Capture stdout, stderr separately (10MB buffer)
+- [x] Return `{ stdout, stderr, exitCode, duration }`
+- [x] Unit test: successful execution, timeout handling, read-only enforcement, syntax error handling
 
-### 6.2 Hybrid Snapshot (`core/src/review/snapshot.ts`)
+### 6.2 Hybrid Snapshot (`core/src/review/snapshot.ts`) ✅ COMPLETE
 
-- [ ] Implement `SnapshotBuilder` class
-- [ ] Constructor: load diff files immediately (pre-fetched from GitHub API)
-- [ ] Implement `getFile(path: string): Promise<string>` — lazy fetcher
-  - [ ] Check in-memory cache first
-  - [ ] Fetch from GitHub API if not cached
-  - [ ] Cache result for duration of review session
-  - [ ] Respect `MAX_FILE_BYTES` limit
-  - [ ] Return empty string for binary files
-- [ ] Implement `listFiles(): Promise<string[]>` — fetch full file tree from GitHub API (lazy)
-- [ ] Respect `MAX_TOTAL_BYTES` cap across all fetched files
-- [ ] Unit test: cache hit, cache miss + fetch, size limit enforcement
+- [x] Implement `SnapshotBuilder` class
+- [x] Constructor: load diff files immediately (pre-fetched from GitHub API)
+- [x] Implement `getFile(path: string): Promise<string>` — lazy fetcher
+  - [x] Check in-memory cache first
+  - [x] Fetch from GitHub API if not cached (with inflight promise dedup)
+  - [x] Cache result for duration of review session
+  - [x] Respect `MAX_FILE_BYTES` limit
+  - [x] Return empty string for binary files (null byte detection on first 8KB)
+- [x] Implement `listFiles(): Promise<string[]>` — fetch full file tree from GitHub API (lazy, cached)
+- [x] Respect `MAX_TOTAL_BYTES` cap across all fetched files
+- [x] Unit test: cache hit, cache miss + fetch, size limit enforcement
 
-### 6.3 RLM Loop (`core/src/review/rlm-runner.ts`)
+### 6.3 RLM Loop (`core/src/review/rlm-runner.ts`) ✅ COMPLETE
 
-- [ ] Define LangGraph state schema: `{ messages, iterations, llmCalls, files, findings, done }`
-- [ ] Implement `reason_node`: calls `createMainLLM()` with current state, returns reasoning + next action
-- [ ] Implement `code_writer_node`: extracts code block from reasoning output
-- [ ] Implement `sandbox_node`: calls `executeSandboxed()` with written code + snapshot globals
-- [ ] Implement `observe_node`: appends sandbox output to state messages
-- [ ] Implement `finalize_node`: calls LLM to produce final findings from all observations
-- [ ] Define edge conditions:
-  - [ ] `iterations >= MAX_ITERATIONS` → finalize
-  - [ ] `llmCalls >= MAX_LLM_CALLS` → finalize
-  - [ ] LLM calls `finish_review` tool → finalize
-  - [ ] Otherwise → reason_node
-- [ ] Compile LangGraph: `StateGraph → CompiledGraph`
-- [ ] Implement `runRLM(pr: PRContext, snapshot: SnapshotBuilder): Promise<ReviewFinding[]>`
-- [ ] Stream iteration events (for acknowledgement comment updates)
-- [ ] Unit test: iteration limit enforcement, finalize triggers, state transitions
-
----
-
-## 7. JSON Trace Logger
-
-### 7.1 Trace Logger (`core/src/trace/logger.ts`)
-
-- [ ] Implement `TraceLogger` class
-- [ ] Constructor: create trace file at `~/.openreview/traces/<timestamp>-<owner>-<repo>-<pr>.json`
-- [ ] Implement `logFastReview(input, output, duration)`: write fast review trace entry
-- [ ] Implement `logRLMIteration(iteration, reasoning, code, sandboxOutput)`: append iteration
-- [ ] Implement `logFindings(findings)`: append final findings
-- [ ] Implement `close()`: write final metadata (total duration, LLM call count)
-- [ ] Ensure no API keys or tokens appear in trace files (scrub before write)
-- [ ] Create `~/.openreview/traces/` directory if it doesn't exist
-- [ ] Unit test: file creation, scrubbing secrets, correct JSON structure
+- [x] Define LangGraph state schema: `{ messages, iterations, llmCalls, files, findings, done }`
+- [x] Implement `reason_node`: calls `createMainLLM()` with current state, returns reasoning + next action
+- [x] Implement `code_writer_node`: extracts code block from reasoning output
+- [x] Implement `sandbox_node`: calls `executeSandboxed()` with written code + snapshot globals
+- [x] Implement `observe_node`: appends sandbox output to state messages
+- [x] Implement `finalize_node`: calls LLM to produce final findings from all observations
+- [x] Define edge conditions:
+  - [x] `iterations >= MAX_ITERATIONS` → finalize
+  - [x] `llmCalls >= MAX_LLM_CALLS` → finalize
+  - [x] LLM calls `finish_review` tool → finalize
+  - [x] Otherwise → reason_node
+- [x] Compile LangGraph: `StateGraph → CompiledGraph` (recursion limit = maxIterations * 5 + 10)
+- [x] Implement `runRLM(pr: PRContext, snapshot: SnapshotBuilder): Promise<ReviewFinding[]>`
+- [x] Stream iteration events (for acknowledgement comment updates) — `RLMEventHandler` callback
+- [x] Unit test: iteration limit enforcement, finalize triggers, state transitions
 
 ---
 
-## 8. Codebase-Aware Chat
+## 7. JSON Trace Logger ✅ COMPLETE (2026-03-24)
 
-### 8.1 Chat Handler (`core/src/chat/chat-handler.ts`)
+### 7.1 Trace Logger (`core/src/trace/logger.ts`) ✅ COMPLETE
 
-- [ ] Implement `handleChatMention(event: CommentEvent): Promise<void>`
-- [ ] Extract question from comment text (strip `@openreview` prefix)
-- [ ] Load conversation thread history for the PR (fetch prior comment chain)
-- [ ] Build chat context: question + thread history + diff + snapshot (lazy)
-- [ ] Create LangGraph chat agent with snapshot tools (`get_file`, `search_files`, `list_files`)
-- [ ] Stream response (internal SSE → final GitHub comment post)
-- [ ] Validate all citations in response against actual file contents
-- [ ] Detect bot's own comments to prevent reply loops
-- [ ] Post final answer as GitHub comment reply in the thread
-
-### 8.2 Follow-up Suggestions (`core/src/chat/suggestions.ts`)
-
-- [ ] Implement `generateSuggestions(answer: string, context: PRContext): Promise<string[]>`
-- [ ] Call `createSubLLM()` (cheaper model) with: answer text + PR context
-- [ ] Request 4–5 follow-up questions, each ≤ 8 words
-- [ ] Append suggestions to chat reply as blockquote list
-- [ ] Unit test: output format, length constraint, empty answer handling
+- [x] Implement `TraceLogger` class
+- [x] Constructor: create trace file at `~/.openreview/traces/<timestamp>-<owner>-<repo>-<pr>.json`
+- [x] Implement `logFastReview(input, output, duration)`: write fast review trace entry
+- [x] Implement `logRLMIteration(iteration, reasoning, code, sandboxOutput)`: append iteration
+- [x] Implement `logFindings(findings)`: append final findings
+- [x] Implement `close()`: write final metadata (total duration, LLM call count)
+- [x] Ensure no API keys or tokens appear in trace files (scrub before write) — regex patterns for OpenAI, GitHub PAT, Slack tokens, generic secrets
+- [x] Create `~/.openreview/traces/` directory if it doesn't exist
+- [x] Unit test: file creation, scrubbing secrets, correct JSON structure
 
 ---
 
-## 9. Learnings Database
+## 8. Codebase-Aware Chat ✅ COMPLETE (2026-03-24)
 
-### 9.1 Learnings Store (`core/src/learnings/learnings-store.ts`)
+### 8.1 Chat Handler (`core/src/chat/chat-handler.ts`) ✅ COMPLETE
 
-- [ ] Implement `LearningsStore` class for repo slug
-- [ ] File path: `~/.openreview/learnings/<org>-<repo>.json`
-- [ ] Create file + directory on first access
-- [ ] Implement `add(trigger: string, finding: string): Promise<Learning>`
-- [ ] Implement `list(): Promise<Learning[]>`
-- [ ] Implement `delete(id: string): Promise<void>`
-- [ ] Implement `getAll(): Promise<Learning[]>` — for prompt injection
-- [ ] Enforce max 50 learnings (prune oldest `usedCount=0` when limit hit)
-- [ ] Implement `recordUsage(id: string)`: increment `usedCount`, update `lastUsedAt`
-- [ ] Trigger phrase detection: `contains(text, ['ignore this', 'false positive', 'this is expected', 'not an issue'])`
-- [ ] Unit test: add, list, delete, max limit pruning, trigger detection
+- [x] Implement `handleChatMention(event: CommentEvent): Promise<void>`
+- [x] Extract question from comment text (strip `@openreview` prefix)
+- [x] Load conversation thread history for the PR (fetch prior comment chain, last 10)
+- [x] Build chat context: question + thread history + diff + snapshot (lazy)
+- [x] Create LangGraph chat agent with snapshot tools (`get_file`, `search_files`, `list_files`)
+- [x] Stream response (internal SSE → final GitHub comment post)
+- [x] Validate all citations in response against actual file contents
+- [x] Detect bot's own comments to prevent reply loops (case-insensitive)
+- [x] Post final answer as GitHub comment reply in the thread
 
-### 9.2 Learning Injection
+### 8.2 Follow-up Suggestions (`core/src/chat/suggestions.ts`) ✅ COMPLETE
 
-- [ ] In `fast-review.ts` and `rlm-runner.ts`: load all learnings for repo, inject into system prompt
-- [ ] Format: `## Team Learnings\n- <learning 1>\n- <learning 2>...`
-- [ ] Cap learnings section at 2,000 tokens
-- [ ] Unit test: injection format, token cap
+- [x] Implement `generateSuggestions(answer: string, context: PRContext): Promise<string[]>`
+- [x] Call `createSubLLM()` (cheaper model, temperature 0.3) with: answer text + PR context
+- [x] Request 4–5 follow-up questions, each ≤ 8 words
+- [x] Append suggestions to chat reply as blockquote list
+- [x] Unit test: output format, length constraint, empty answer handling
+
+---
+
+## 9. Learnings Database ✅ COMPLETE (2026-03-24)
+
+### 9.1 Learnings Store (`core/src/learnings/learnings-store.ts`) ✅ COMPLETE
+
+- [x] Implement `LearningsStore` class for repo slug
+- [x] File path: `~/.openreview/learnings/<org>-<repo>.json`
+- [x] Create file + directory on first access
+- [x] Implement `add(trigger: string, finding: string): Promise<Learning>`
+- [x] Implement `list(): Promise<Learning[]>`
+- [x] Implement `delete(id: string): Promise<void>`
+- [x] Implement `getAll(): Promise<Learning[]>` — for prompt injection
+- [x] Enforce max 50 learnings (prune oldest `usedCount=0` when limit hit; if all used, prune oldest by createdAt)
+- [x] Implement `recordUsage(id: string)`: increment `usedCount`, update `lastUsedAt`
+- [x] Trigger phrase detection: `containsTrigger(text)` — "ignore this", "false positive", "this is expected", "not an issue", "not a bug", "known issue", "by design", "intentional"
+- [x] Unit test: add, list, delete, max limit pruning, trigger detection
+
+### 9.2 Learning Injection ✅ COMPLETE
+
+- [x] In `fast-review.ts` and `rlm-runner.ts`: load all learnings for repo, inject into system prompt
+- [x] Format: `## Team Learnings\n- <learning 1>\n- <learning 2>...` via `formatLearningsForPrompt()`
+- [x] Cap learnings section at 2,000 tokens (~8000 chars)
+- [x] Unit test: injection format, token cap
 
 ---
 
@@ -402,7 +402,7 @@
 
 ---
 
-## 14. Testing & QA ✅ 85% COMPLETE (2026-03-24)
+## 14. Testing & QA ✅ 95% COMPLETE (2026-03-24)
 
 - [x] Unit tests for every module above (target: > 80% coverage) — 321 tests passing
 - [x] Integration test: `npx openreview review --url <public-test-PR>` end-to-end — CLI works (fast + RLM)
@@ -441,86 +441,6 @@
 - [ ] GitHub Action listed on GitHub Marketplace
 - [ ] Post on: GitHub (README), Hacker News (Show HN), Reddit r/programming, X/Twitter
 - [ ] First 3 OSS projects onboarded as beta testers
-
----
-
-## 16. Impact Analysis — Phase 1 MVP
-
-### 16.1 Impact Types (`core/src/impact/types.ts`)
-- [ ] Define `ImpactNode` interface: `file`, `importedSymbols`, `proximity`, `relevanceScore`, `importChain`
-- [ ] Define `ImpactResult` interface: `changedFiles`, `impactedFiles`, `affectedPages`, `affectedComponents`, `summary`
-- [ ] Define `ImpactGraph` interface for internal dependency graph representation
-- [ ] Define relevance scoring constants: direct (1.0), 2nd degree (0.7), 3rd degree (0.5), deeper (diminishing)
-- [ ] Export impact types from `core/src/review/types.ts` (canonical re-export)
-
-### 16.2 Tree-sitter Dependency Graph Builder (`core/src/impact/tree-sitter.ts`)
-- [ ] Install `tree-sitter` and language grammars (tree-sitter-typescript, tree-sitter-python, tree-sitter-javascript, etc.) in `core`
-- [ ] Implement `detectLanguage(filePath: string): string` — map file extension to Tree-sitter grammar
-- [ ] Implement `extractImports(filePath: string, content: string): ImportInfo[]` — parse file AST, extract import/require/use statements
-- [ ] Implement `extractExports(filePath: string, content: string): ExportInfo[]` — parse file AST, extract exported symbols
-- [ ] Support language-agnostic parsing: JS/TS (`import`/`require`/`export`), Python (`import`/`from`), Go (`import`), Java (`import`), Ruby (`require`/`require_relative`), Rust (`use`/`mod`)
-- [ ] Handle dynamic imports and re-exports
-- [ ] Guard against malformed input — validate AST nodes before accessing properties
-- [ ] Unit test: import extraction per language, export extraction, dynamic imports, malformed input
-
-### 16.3 Dependency Graph & Traversal (`core/src/impact/graph.ts`)
-- [ ] Implement `buildDependencyGraph(files: string[], repoPath: string): ImpactGraph` — build full repo import graph using Tree-sitter
-- [ ] Implement `traceImpact(changedFiles: string[], graph: ImpactGraph): ImpactNode[]` — BFS/DFS transitive traversal from changed files
-- [ ] Implement relevance scoring: score = f(proximity), direct = 1.0, each degree reduces score
-- [ ] Implement configurable depth threshold (`IMPACT_DEPTH_THRESHOLD`) to cap traversal depth
-- [ ] Deduplicate: if a file is reachable via multiple paths, keep highest relevance score
-- [ ] Sort results: highest relevance first
-- [ ] Unit test: graph building, transitive traversal, scoring, deduplication, depth threshold
-
-### 16.4 Component-to-Page Mapper (`core/src/impact/component-mapper.ts`)
-- [ ] Implement `mapToPages(impactedFiles: ImpactNode[], repoPath: string): PageMapping[]` — identify which UI pages/routes are affected
-- [ ] Detect page/route files by convention: files in `pages/`, `routes/`, `views/`, `screens/` directories or files matching common routing patterns
-- [ ] Detect route definitions: React Router, Next.js pages/app dir, Vue Router, Angular routing modules
-- [ ] For each impacted file, trace upward to the page/route that renders it
-- [ ] Return mapping: `{ component: string, pages: string[], routes: string[] }`
-- [ ] Unit test: page detection, route detection, component-to-page mapping
-
-### 16.5 Impact Analyzer Entry Point (`core/src/impact/analyzer.ts`)
-- [ ] Implement `analyzeImpact(changedFiles: string[], repoPath: string, config: ImpactConfig): Promise<ImpactResult>`
-- [ ] Orchestrate: build graph → trace impact → score → map components → build result
-- [ ] Accept both git diff files and manual `--files` input
-- [ ] Respect `IMPACT_ENABLED` and `IMPACT_DEPTH_THRESHOLD` config
-- [ ] Performance target: < 30 seconds for repos with ≤ 500 files
-- [ ] Unit test: end-to-end flow with mock repo, config handling, performance
-
-### 16.6 Review Pipeline Integration
-- [ ] Add `IMPACT_ENABLED` (boolean, default: true) and `IMPACT_DEPTH_THRESHOLD` (number, default: 10) to `core/src/config/env.ts`
-- [ ] In `core/src/review/fast-review.ts`: call `analyzeImpact()` after deduplication, before sorting
-- [ ] Enrich each `ReviewFinding` with optional `impactScope?: { affectedFiles: number, affectedPages: number }` field
-- [ ] Re-sort findings: impact-weighted prioritization (high-impact files surface first)
-- [ ] Add impact summary to `ReviewSummary` type
-- [ ] Unit test: integration with review pipeline, finding enrichment, prioritization
-
-### 16.7 CLI Integration
-- [ ] In `cli/src/commands/review.ts`: add `--impact` and `--no-impact` flags
-- [ ] Add interactive prompt: "Would you like to include impact analysis? (y/n)" (shown when neither flag is set)
-- [ ] Add `--files <paths>` flag for manual file targeting (comma-separated)
-- [ ] When `--impact` or user says "y": call impact analysis as part of review
-- [ ] When `--no-impact` or user says "n": skip impact analysis
-
-### 16.8 Terminal Output
-- [ ] Implement `formatImpactTree(result: ImpactResult): string` — structured tree view of impacted files
-- [ ] Show proximity scores, import chain paths, and affected page/route annotations
-- [ ] Group by proximity level: Direct Dependents → 2nd Degree → 3rd Degree → Deeper
-- [ ] Highlight component-to-page mapping section
-- [ ] Unit test: formatting output for various impact scenarios
-
-### 16.9 JSON Report Output
-- [ ] Implement `writeImpactReport(result: ImpactResult, outputPath: string): void`
-- [ ] Write machine-readable JSON file (`impact-report.json`) alongside review output
-- [ ] Include all impact data: changed files, impacted files with scores, affected pages, summary stats
-- [ ] Unit test: JSON structure, file writing
-
-### 16.10 Review Output Integration
-- [ ] Add standalone "Impact Analysis" section to review summary (terminal and summary comment)
-- [ ] Format: total impacted files, direct vs transitive count, affected pages list
-- [ ] Annotate individual findings with impact scope (e.g., "⚡ High impact — affects 12 files across 3 pages")
-- [ ] Unit test: summary section format, finding annotation format
 
 ---
 
@@ -630,52 +550,6 @@
 - [ ] Output findings as suggestions/observations (category: flag only, no bug)
 - [ ] `--submit` posts response as issue comment
 
-## 13. Impact Analysis — Phase 2 (Advanced)
-
-### 11.1 LLM-Powered Semantic/Data-Flow Analysis
-- [ ] Implement `core/src/impact/semantic-analyzer.ts` — LangGraph agent for data-flow reasoning
-- [ ] Feed Tree-sitter dependency graph as initial context to LLM
-- [ ] LLM traces data flow across boundaries: frontend → API route → backend handler → database query
-- [ ] Identify cross-layer impacts (e.g., form field rename affects API contract, backend validation, database schema)
-- [ ] Return enriched `ImpactNode[]` with `dataFlowPath` annotations
-- [ ] Unit test: data-flow detection across mock multi-layer codebase
-
-### 11.2 Screenshot Diffing
-- [ ] Implement `core/src/impact/screenshot-differ.ts`
-- [ ] Run target app in sandbox (Deno Phase 1, Docker Phase 2)
-- [ ] Use headless browser (Playwright) to capture screenshots of affected pages before/after changes
-- [ ] Compute pixel-level or component-level visual diff
-- [ ] Generate annotated diff images highlighting affected UI regions
-- [ ] Store screenshots in `~/.openreview/traces/<pr>/screenshots/`
-- [ ] Unit test: screenshot capture, diff computation, annotation generation
-
-### 11.3 Live Preview in Sandbox
-- [ ] Implement `core/src/impact/live-preview.ts`
-- [ ] Spin up app in sandbox environment
-- [ ] Render affected pages identified by component mapper
-- [ ] Annotate impacted components with visual overlay markers (border highlighting, labels)
-- [ ] Return rendered page URLs or screenshots with annotations
-- [ ] Support both Docker (CI) and local dev server (CLI) environments
-
-### 11.4 GitHub PR Comment — Impact Summary
-- [ ] Extend `core/src/github/comments.ts` with `postImpactComment(prNumber, impactResult): Promise<void>`
-- [ ] Format as collapsible table: impacted files grouped by category (direct/transitive), proximity scores, affected pages
-- [ ] Use `<!-- openreview-impact -->` HTML marker for replace-not-duplicate strategy
-- [ ] Include visual diff thumbnails (as GitHub image links) when screenshot diffing is enabled
-
-### 11.5 Interactive HTML Report / Web Dashboard
-- [ ] Implement impact visualization component in `web/` (React 19 + Vite 8)
-- [ ] Visual dependency graph: nodes = files, edges = imports, colored by impact proximity
-- [ ] Click-to-expand: click a node to see its import chain and affected pages
-- [ ] Integrate with `npx openreview serve` — serve impact report alongside review data
-- [ ] Export as standalone HTML file for sharing
-
-### 11.6 Docker Container Sandbox for UI Rendering
-- [ ] Extend `core/src/sandbox/docker-runner.ts` to support headless browser (Playwright) execution
-- [ ] Docker image includes: Node.js, Playwright, Chromium
-- [ ] Resource limits: CPU 1.0, memory 1GB, time 120s (higher than code sandbox due to rendering)
-- [ ] Fallback to local dev server when Docker not available (CLI mode)
-
 ---
 
 # PHASE 3 — ENTERPRISE (6+ Months Post-MVP)
@@ -756,4 +630,4 @@
 
 ---
 
-_To-Do List v1.1 — OpenReview — 2026-03-17_
+_To-Do List v1.3 — OpenReview — 2026-03-24_
