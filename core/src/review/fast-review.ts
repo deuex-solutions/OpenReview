@@ -104,9 +104,9 @@ async function invokeStructured(
     0,
   );
 
-  const result = await structuredLlm.invoke(prompt);
+  const result = (await structuredLlm.invoke(prompt)) as z.infer<typeof ReviewOutputSchema>;
 
-  return result.findings.map((f) => ({
+  return result.findings.map((f: z.infer<typeof FindingSchema>) => ({
     id: `ai-${randomUUID().slice(0, 8)}`,
     category: f.category,
     severity: f.severity,

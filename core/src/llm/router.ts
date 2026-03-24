@@ -1,6 +1,5 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { BaseMessageLike } from '@langchain/core/messages';
 import type { Runnable } from '@langchain/core/runnables';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
@@ -109,13 +108,12 @@ export function createSubLLM(): BaseChatModel {
  * - Anthropic: function calling (high reliability)
  * - Fallback: function calling for older models (gpt-3.5-turbo)
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createStructuredLLM<T extends z.ZodType>(
   modelId: string,
   schema: T,
   name: string,
   temperature = 0,
-): Runnable<any, z.infer<T>> {
+): Runnable {
   const llm = createLLM(modelId, temperature);
   const provider = detectProvider(modelId);
 
@@ -125,10 +123,7 @@ export function createStructuredLLM<T extends z.ZodType>(
 
   const method = supportsJsonSchema ? 'jsonSchema' : 'functionCalling';
 
-  return llm.withStructuredOutput(schema, { method, name, strict: true }) as Runnable<
-    any,
-    z.infer<T>
-  >;
+  return llm.withStructuredOutput(schema, { method, name, strict: true });
 }
 
 /* ------------------------------------------------------------------ */
