@@ -93,6 +93,7 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 - ✅ `CONTRIBUTING.md` — Setup, workflow, conventions, PR process
 - ✅ QA: 321 tests, 10/10 test PR bugs caught (18 findings), CLI E2E verified (fast + RLM)
 - ✅ Bug fixes from manual testing: auth scheme detection, structured output, severity normalization, file-type-aware prompting, sandbox `deno run`, RLM recursion limit, temperature control
+- [ ] `--submit` flag: post CLI review findings as GitHub PR comment (pre-launch gap closure)
 - [ ] Launch checklist: npm publish, GitHub Marketplace, public announcement (deferred)
 
 #### Week 5–6 — Impact Analysis (Phase 1 MVP)
@@ -151,6 +152,20 @@ Transform OpenReview from a CLI tool into a full product experience — with a W
 - Citation navigation: click finding → jump to diff line
 - Copy/move visualization in diff viewer
 - `npx openreview serve` starts local Express 5 + Vite 8 dev server
+
+#### 2.1.1 Local Directory Review
+
+- `openreview review --path <dir>` — review local code changes without a GitHub PR
+- Generate diff from `git diff HEAD` locally, build PRContext from filesystem
+- Works offline (only LLM API call needed)
+- Supports `--files <paths>` for targeted file review
+
+#### 2.1.2 GitHub Issue Review
+
+- Support `/issues/<number>` URLs alongside `/pull/<number>`
+- Fetch issue body + comments, send to LLM for analysis
+- Output as suggestions/observations (no inline code comments)
+- `--submit` posts response as issue comment
 
 #### 2.2 Auto-Fix Application
 

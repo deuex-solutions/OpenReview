@@ -420,6 +420,18 @@
 
 ---
 
+## 14.5 Pre-Launch Feature Gap Closure
+
+### 14.5.1 `--submit` Flag (Post findings as GitHub comment from CLI)
+
+- [ ] Add `--submit` flag to `cli/src/commands/review.ts`
+- [ ] When `--submit` is set: after review, call `CommentPoster.postReview()` + `CommentPoster.postSummaryComment()`
+- [ ] Require `GITHUB_TOKEN` or `GITHUB_PAT` when `--submit` is used
+- [ ] Print confirmation: "Review posted as comment on PR #X"
+- [ ] Skip posting if 0 findings (just post summary)
+
+---
+
 ## 15. Launch Checklist (DEFERRED)
 
 - [ ] GitHub repository made public
@@ -600,7 +612,24 @@
 - [ ] Post diagram in summary comment (code block with `mermaid` language tag)
 - [ ] Toggle via config: `SEQUENCE_DIAGRAMS=true`
 
-## 11. Impact Analysis — Phase 2 (Advanced)
+## 11. Local Directory Review (`--path`)
+
+- [ ] Add `--path <dir>` flag to `cli/src/commands/review.ts` (mutually exclusive with `--url`)
+- [ ] Generate diff from `git diff HEAD` in the local directory
+- [ ] Build `PRContext` from local filesystem (no GitHub API calls)
+- [ ] Support `--files <paths>` for reviewing specific files
+- [ ] Works offline — only LLM API call needed
+- [ ] Output same format as remote PR review (text/markdown/json)
+
+## 12. GitHub Issue Review
+
+- [ ] Support `/issues/<number>` URLs in `parsePRUrl()` alongside `/pull/<number>`
+- [ ] Fetch issue body + comments via GitHub API
+- [ ] Send issue context to LLM for analysis (no diff, just text)
+- [ ] Output findings as suggestions/observations (category: flag only, no bug)
+- [ ] `--submit` posts response as issue comment
+
+## 13. Impact Analysis — Phase 2 (Advanced)
 
 ### 11.1 LLM-Powered Semantic/Data-Flow Analysis
 - [ ] Implement `core/src/impact/semantic-analyzer.ts` — LangGraph agent for data-flow reasoning

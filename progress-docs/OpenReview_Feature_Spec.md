@@ -238,6 +238,12 @@
 - Output formats: text, markdown, JSON (`--output` flag)
 - `--model` flag to override LLM at runtime
 - `--expert` flag for comprehensive SOLID/security/quality deep review mode
+- `--submit` flag to post CLI review findings as GitHub PR comment (batch review + summary)
+
+### Future Phases
+
+- `--path <dir>` flag for local directory review without GitHub PR (Phase 2)
+- `/issues/<number>` URL support for reviewing GitHub Issues alongside PRs (Phase 2)
 
 ---
 

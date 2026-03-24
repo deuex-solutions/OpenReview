@@ -169,6 +169,7 @@ inputs:
 - `--output text|markdown|json` controls output format
 - `--model <model-id>` overrides the configured model at runtime
 - `--expert` triggers comprehensive SOLID/security/quality review
+- `--submit` posts findings as a GitHub PR comment (batch review + summary comment)
 - Works without a local clone of the repository
 
 #### Manual Trigger (GitHub Comment)
@@ -667,6 +668,8 @@ interface ImpactResult {
 - MCP server integration (Phase 3)
 - `.reviewbuddy.yaml` per-repo config (Phase 2)
 - Central org-wide config repo (Phase 3)
+- Local directory review (`--path` flag for reviewing local code without GitHub PR) (Phase 2)
+- GitHub Issue review (`/issues/` URL support alongside `/pull/`) (Phase 2)
 - Impact Analysis Phase 2: LLM data-flow analysis, screenshot diffing, live preview, GitHub PR comment, interactive HTML report, Docker sandbox for UI rendering (Phase 2)
 
 ---
