@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatInlineComment, formatSummaryComment } from './formatter.js';
-import type { ReviewFinding, ReviewSummary } from './types.js';
+import { formatInlineComment, formatSummaryComment } from '../../../core/src/review/formatter.js';
+import type { ReviewFinding, ReviewSummary } from '../../../core/src/review/types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Helper                                                             */
@@ -60,7 +60,9 @@ describe('formatInlineComment', () => {
   });
 
   it('includes title and explanation', () => {
-    const result = formatInlineComment(makeFinding({ title: 'My Title', explanation: 'My Explanation' }));
+    const result = formatInlineComment(
+      makeFinding({ title: 'My Title', explanation: 'My Explanation' }),
+    );
     expect(result).toContain('My Title');
     expect(result).toContain('My Explanation');
   });
@@ -105,10 +107,12 @@ describe('formatInlineComment', () => {
   });
 
   it('handles special characters in title and explanation', () => {
-    const result = formatInlineComment(makeFinding({
-      title: 'Use `??` instead of `||`',
-      explanation: 'The `||` operator coerces to boolean — use `??` for nullish coalescing.',
-    }));
+    const result = formatInlineComment(
+      makeFinding({
+        title: 'Use `??` instead of `||`',
+        explanation: 'The `||` operator coerces to boolean — use `??` for nullish coalescing.',
+      }),
+    );
     expect(result).toContain('`??`');
     expect(result).toContain('`||`');
   });
@@ -136,7 +140,9 @@ describe('formatSummaryComment', () => {
   });
 
   it('shows files reviewed, duration, and mode', () => {
-    const result = formatSummaryComment(makeSummary({ filesReviewed: 42, duration: '5m 30s', mode: 'rlm' }));
+    const result = formatSummaryComment(
+      makeSummary({ filesReviewed: 42, duration: '5m 30s', mode: 'rlm' }),
+    );
     expect(result).toContain('**Files reviewed:** 42');
     expect(result).toContain('**Duration:** 5m 30s');
     expect(result).toContain('**Mode:** rlm');
@@ -149,10 +155,12 @@ describe('formatSummaryComment', () => {
   });
 
   it('shows severity table for findings', () => {
-    const result = formatSummaryComment(makeSummary({
-      totalFindings: 6,
-      findingsBySeverity: { severe: 1, 'non-severe': 2, investigate: 1, informational: 2 },
-    }));
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 6,
+        findingsBySeverity: { severe: 1, 'non-severe': 2, investigate: 1, informational: 2 },
+      }),
+    );
     expect(result).toContain('🔴 **Bug — Severe**');
     expect(result).toContain('🟠 **Bug — Non-severe**');
     expect(result).toContain('🔍 **Flag — Investigate**');
@@ -161,10 +169,12 @@ describe('formatSummaryComment', () => {
   });
 
   it('only shows non-zero severity rows', () => {
-    const result = formatSummaryComment(makeSummary({
-      totalFindings: 1,
-      findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 0, informational: 0 },
-    }));
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 1,
+        findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 0, informational: 0 },
+      }),
+    );
     expect(result).toContain('🔴 **Bug — Severe**');
     expect(result).not.toContain('🟠 **Bug — Non-severe**');
     expect(result).not.toContain('🔍 **Flag — Investigate**');
@@ -172,19 +182,23 @@ describe('formatSummaryComment', () => {
   });
 
   it('uses singular "finding" for count of 1', () => {
-    const result = formatSummaryComment(makeSummary({
-      totalFindings: 1,
-      findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 0, informational: 0 },
-    }));
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 1,
+        findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 0, informational: 0 },
+      }),
+    );
     expect(result).toContain('**Total:** 1 finding');
     expect(result).not.toContain('1 findings');
   });
 
   it('uses plural "findings" for count > 1', () => {
-    const result = formatSummaryComment(makeSummary({
-      totalFindings: 5,
-      findingsBySeverity: { severe: 5, 'non-severe': 0, investigate: 0, informational: 0 },
-    }));
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 5,
+        findingsBySeverity: { severe: 5, 'non-severe': 0, investigate: 0, informational: 0 },
+      }),
+    );
     expect(result).toContain('5 findings');
   });
 
@@ -195,20 +209,24 @@ describe('formatSummaryComment', () => {
   });
 
   it('handles very large counts', () => {
-    const result = formatSummaryComment(makeSummary({
-      totalFindings: 9999,
-      filesReviewed: 500,
-      findingsBySeverity: { severe: 9999, 'non-severe': 0, investigate: 0, informational: 0 },
-    }));
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 9999,
+        filesReviewed: 500,
+        findingsBySeverity: { severe: 9999, 'non-severe': 0, investigate: 0, informational: 0 },
+      }),
+    );
     expect(result).toContain('9999');
     expect(result).toContain('500');
   });
 
   it('severity rows appear in correct order (severe first)', () => {
-    const result = formatSummaryComment(makeSummary({
-      totalFindings: 4,
-      findingsBySeverity: { severe: 1, 'non-severe': 1, investigate: 1, informational: 1 },
-    }));
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 4,
+        findingsBySeverity: { severe: 1, 'non-severe': 1, investigate: 1, informational: 1 },
+      }),
+    );
     const severeIdx = result.indexOf('Bug — Severe');
     const nonSevereIdx = result.indexOf('Bug — Non-severe');
     const investigateIdx = result.indexOf('Flag — Investigate');

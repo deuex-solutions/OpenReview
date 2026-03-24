@@ -1,7 +1,4 @@
-import {
-  formatInlineComment,
-  formatSummaryComment,
-} from '../review/formatter.js';
+import { formatInlineComment, formatSummaryComment } from '../review/formatter.js';
 import type { ReviewFinding, ReviewSummary } from '../review/types.js';
 
 import type { GitHubClient } from './client.js';
@@ -64,10 +61,10 @@ export class CommentPoster {
     }
   }
 
-  /** Reply to a specific review comment. */
-  async postChatReply(commentId: number, reply: string): Promise<void> {
+  /** Reply in a PR thread by posting a new issue comment. */
+  async postChatReply(prNumber: number, reply: string): Promise<void> {
     await this.client['api'].post(
-      `/repos/${this.client.owner}/${this.client.repo}/issues/comments/${commentId}`,
+      `/repos/${this.client.owner}/${this.client.repo}/issues/${prNumber}/comments`,
       { body: reply },
     );
   }

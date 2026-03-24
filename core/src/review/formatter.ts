@@ -38,7 +38,8 @@ export function formatSummaryComment(summary: ReviewSummary): string {
   }
 
   md += '\n---\n';
-  md += '*Trigger deep review: `@openreview rlm` | Ask a question: `@openreview <your question>`*\n';
+  md +=
+    '*Trigger deep review: `@openreview rlm` | Ask a question: `@openreview <your question>`*\n';
 
   return md;
 }

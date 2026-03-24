@@ -35,9 +35,7 @@ export async function runFastReview(
   const response = await llm.invoke(prompt);
 
   const responseText =
-    typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content);
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
   // 3. Parse LLM response
   const aiFindings = parseLLMResponse(responseText);

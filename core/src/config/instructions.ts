@@ -115,7 +115,8 @@ export async function loadInstructions(repoPath: string): Promise<InstructionRes
     if (totalChars >= MAX_CHARS) break;
 
     const remaining = MAX_CHARS - totalChars;
-    const content = file.content.length > remaining ? file.content.slice(0, remaining) : file.content;
+    const content =
+      file.content.length > remaining ? file.content.slice(0, remaining) : file.content;
 
     if (file.depth === 0) {
       globalParts.push(content);

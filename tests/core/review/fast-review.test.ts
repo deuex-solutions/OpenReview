@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractDiffLineMap, parseLLMResponse } from './fast-review.js';
+import { extractDiffLineMap, parseLLMResponse } from '../../../core/src/review/fast-review.js';
 
 /* ------------------------------------------------------------------ */
 /*  parseLLMResponse — exhaustive                                      */
@@ -34,13 +34,15 @@ describe('parseLLMResponse', () => {
   });
 
   it('handles response wrapped in ```json code fences', () => {
-    const response = '```json\n[{"category":"flag","severity":"investigate","file":"a.ts","startLine":1,"endLine":1,"title":"T","explanation":"E"}]\n```';
+    const response =
+      '```json\n[{"category":"flag","severity":"investigate","file":"a.ts","startLine":1,"endLine":1,"title":"T","explanation":"E"}]\n```';
     const findings = parseLLMResponse(response);
     expect(findings).toHaveLength(1);
   });
 
   it('handles response wrapped in ``` code fences (no language)', () => {
-    const response = '```\n[{"category":"bug","severity":"severe","file":"a.ts","startLine":1,"title":"T","explanation":"E"}]\n```';
+    const response =
+      '```\n[{"category":"bug","severity":"severe","file":"a.ts","startLine":1,"title":"T","explanation":"E"}]\n```';
     const findings = parseLLMResponse(response);
     expect(findings).toHaveLength(1);
   });
@@ -100,7 +102,14 @@ describe('parseLLMResponse', () => {
   it('skips invalid items but keeps valid ones', () => {
     const response = JSON.stringify([
       { bad: 'item' },
-      { category: 'bug', severity: 'severe', file: 'a.ts', startLine: 1, title: 'Valid', explanation: 'Valid' },
+      {
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'Valid',
+        explanation: 'Valid',
+      },
       { category: 'bug' }, // missing fields
     ]);
 
@@ -111,7 +120,14 @@ describe('parseLLMResponse', () => {
 
   it('defaults endLine to startLine when missing', () => {
     const response = JSON.stringify([
-      { category: 'bug', severity: 'non-severe', file: 'a.ts', startLine: 10, title: 'T', explanation: 'E' },
+      {
+        category: 'bug',
+        severity: 'non-severe',
+        file: 'a.ts',
+        startLine: 10,
+        title: 'T',
+        explanation: 'E',
+      },
     ]);
 
     const findings = parseLLMResponse(response);
@@ -120,7 +136,14 @@ describe('parseLLMResponse', () => {
 
   it('defaults unknown severity to investigate', () => {
     const response = JSON.stringify([
-      { category: 'bug', severity: 'unknown-level', file: 'a.ts', startLine: 1, title: 'T', explanation: 'E' },
+      {
+        category: 'bug',
+        severity: 'unknown-level',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'T',
+        explanation: 'E',
+      },
     ]);
 
     const findings = parseLLMResponse(response);
@@ -138,7 +161,14 @@ describe('parseLLMResponse', () => {
 
   it('defaults unknown category to flag', () => {
     const response = JSON.stringify([
-      { category: 'unknown', severity: 'severe', file: 'a.ts', startLine: 1, title: 'T', explanation: 'E' },
+      {
+        category: 'unknown',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'T',
+        explanation: 'E',
+      },
     ]);
 
     const findings = parseLLMResponse(response);
@@ -147,7 +177,15 @@ describe('parseLLMResponse', () => {
 
   it('preserves suggestedFix when present', () => {
     const response = JSON.stringify([
-      { category: 'bug', severity: 'severe', file: 'a.ts', startLine: 1, title: 'T', explanation: 'E', suggestedFix: 'const x = 2;' },
+      {
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'T',
+        explanation: 'E',
+        suggestedFix: 'const x = 2;',
+      },
     ]);
 
     const findings = parseLLMResponse(response);
@@ -156,7 +194,14 @@ describe('parseLLMResponse', () => {
 
   it('suggestedFix is undefined when not present', () => {
     const response = JSON.stringify([
-      { category: 'bug', severity: 'severe', file: 'a.ts', startLine: 1, title: 'T', explanation: 'E' },
+      {
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'T',
+        explanation: 'E',
+      },
     ]);
 
     const findings = parseLLMResponse(response);
@@ -164,7 +209,8 @@ describe('parseLLMResponse', () => {
   });
 
   it('extracts JSON array embedded in surrounding text', () => {
-    const response = 'Here are the findings:\n[{"category":"bug","severity":"severe","file":"a.ts","startLine":1,"title":"T","explanation":"E"}]\nDone reviewing.';
+    const response =
+      'Here are the findings:\n[{"category":"bug","severity":"severe","file":"a.ts","startLine":1,"title":"T","explanation":"E"}]\nDone reviewing.';
     const findings = parseLLMResponse(response);
     expect(findings).toHaveLength(1);
   });
@@ -204,8 +250,22 @@ describe('parseLLMResponse', () => {
 
   it('each finding gets a unique ID', () => {
     const response = JSON.stringify([
-      { category: 'bug', severity: 'severe', file: 'a.ts', startLine: 1, title: 'T1', explanation: 'E1' },
-      { category: 'bug', severity: 'severe', file: 'a.ts', startLine: 1, title: 'T2', explanation: 'E2' },
+      {
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'T1',
+        explanation: 'E1',
+      },
+      {
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 1,
+        title: 'T2',
+        explanation: 'E2',
+      },
     ]);
 
     const findings = parseLLMResponse(response);
@@ -215,7 +275,14 @@ describe('parseLLMResponse', () => {
   it('handles startLine of 0', () => {
     // startLine of 0 is falsy — should be rejected as invalid
     const response = JSON.stringify([
-      { category: 'bug', severity: 'severe', file: 'a.ts', startLine: 0, title: 'T', explanation: 'E' },
+      {
+        category: 'bug',
+        severity: 'severe',
+        file: 'a.ts',
+        startLine: 0,
+        title: 'T',
+        explanation: 'E',
+      },
     ]);
     const findings = parseLLMResponse(response);
     expect(findings).toEqual([]);
@@ -225,7 +292,14 @@ describe('parseLLMResponse', () => {
     const severities = ['severe', 'non-severe', 'investigate', 'informational'];
     for (const sev of severities) {
       const response = JSON.stringify([
-        { category: 'bug', severity: sev, file: 'a.ts', startLine: 1, title: 'T', explanation: 'E' },
+        {
+          category: 'bug',
+          severity: sev,
+          file: 'a.ts',
+          startLine: 1,
+          title: 'T',
+          explanation: 'E',
+        },
       ]);
       const findings = parseLLMResponse(response);
       expect(findings[0].severity).toBe(sev);
@@ -382,8 +456,8 @@ deleted file mode 100644
 
     const map = extractDiffLineMap(diff);
     const lines = map.get('a.ts')!;
-    expect(lines.has(2)).toBe(true);  // new2
-    expect(lines.has(4)).toBe(true);  // new4
+    expect(lines.has(2)).toBe(true); // new2
+    expect(lines.has(4)).toBe(true); // new4
     expect(lines.size).toBe(2);
   });
 

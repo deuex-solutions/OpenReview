@@ -32,6 +32,7 @@ npx openreview review --url <PR-URL> --output json
 ## Expert Mode (`--expert`)
 
 Triggers a comprehensive review covering:
+
 - **SOLID principles** — single responsibility, open/closed, Liskov substitution, interface segregation, dependency inversion
 - **Security** — injection vulnerabilities, authentication/authorization gaps, secrets exposure, OWASP top 10
 - **Code quality** — error handling, edge cases, performance, maintainability, naming, duplication
@@ -41,16 +42,19 @@ Findings are severity-tagged (Severe Bug, Non-severe Bug, Investigate, Informati
 ## Examples
 
 ### Claude Code
+
 ```
 Review this PR for bugs and security issues: https://github.com/owner/repo/pull/123
 ```
 
 ### Cursor
+
 ```
 @openreview review --url https://github.com/owner/repo/pull/123 --expert
 ```
 
 ### Gemini CLI
+
 ```
 Use the openreview skill to review https://github.com/owner/repo/pull/123
 ```

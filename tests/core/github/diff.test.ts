@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectMovesAndCopies, filterDiffs, parseDiff } from './diff.js';
+import { detectMovesAndCopies, filterDiffs, parseDiff } from '../../../core/src/github/diff.js';
 
 /* ------------------------------------------------------------------ */
 /*  parseDiff                                                          */

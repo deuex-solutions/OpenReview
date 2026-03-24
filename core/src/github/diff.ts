@@ -161,10 +161,7 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   return union === 0 ? 0 : intersection / union;
 }
 
-export function detectMovesAndCopies(
-  diffs: ParsedDiff[],
-  threshold?: number,
-): MoveEvent[] {
+export function detectMovesAndCopies(diffs: ParsedDiff[], threshold?: number): MoveEvent[] {
   const thresh = threshold ?? config.moveDetectionThreshold;
   const events: MoveEvent[] = [];
 
@@ -220,10 +217,10 @@ function matchGlob(pattern: string, filepath: string): boolean {
 
   // Handle ** patterns: replace **/ with (any-path-prefix-or-empty)
   regexStr = regexStr
-    .replace(/\*\*\//g, '(.+/)?')  // **/ matches zero or more directories
-    .replace(/\/\*\*/g, '(/.*)?')  // /** matches zero or more trailing segments
-    .replace(/\*\*/g, '.*')        // standalone ** matches anything
-    .replace(/\*/g, '[^/]*');       // single * matches within one segment
+    .replace(/\*\*\//g, '(.+/)?') // **/ matches zero or more directories
+    .replace(/\/\*\*/g, '(/.*)?') // /** matches zero or more trailing segments
+    .replace(/\*\*/g, '.*') // standalone ** matches anything
+    .replace(/\*/g, '[^/]*'); // single * matches within one segment
 
   return new RegExp(`^${regexStr}$`).test(filepath);
 }

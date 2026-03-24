@@ -58,10 +58,7 @@ interface RetryConfig extends InternalAxiosRequestConfig {
 
 function attachRateLimitInterceptor(client: AxiosInstance): void {
   client.interceptors.response.use(undefined, async (error: AxiosError) => {
-    if (
-      error.response?.status === 403 &&
-      error.response.headers['x-ratelimit-remaining'] === '0'
-    ) {
+    if (error.response?.status === 403 && error.response.headers['x-ratelimit-remaining'] === '0') {
       const resetEpoch = Number(error.response.headers['x-ratelimit-reset']);
       const waitMs = Math.max(0, resetEpoch * 1000 - Date.now()) + 1000;
       await new Promise((r) => setTimeout(r, waitMs));
@@ -185,30 +182,51 @@ export class GitHubClient {
   /* ---- Raw diff ---- */
 
   async getPRDiff(prNumber: number): Promise<string> {
-    const { data } = await this.api.get(
-      `/repos/${this.owner}/${this.repo}/pulls/${prNumber}`,
-      { headers: { Accept: 'application/vnd.github.v3.diff' } },
-    );
+    const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/pulls/${prNumber}`, {
+      headers: { Accept: 'application/vnd.github.v3.diff' },
+    });
     return data as string;
   }
 
   /* ---- File content at ref ---- */
 
   async getFileContent(path: string, ref: string): Promise<string> {
-    const { data } = await this.api.get(
-      `/repos/${this.owner}/${this.repo}/contents/${path}`,
-      { params: { ref }, headers: { Accept: 'application/vnd.github.v3.raw' } },
-    );
+    const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/contents/${path}`, {
+      params: { ref },
+      headers: { Accept: 'application/vnd.github.v3.raw' },
+    });
     return typeof data === 'string' ? data : JSON.stringify(data);
   }
 
   /* ---- File tree at ref ---- */
 
-  async getFileTree(ref: string): Promise<string[]> {
+  /* ---- PR / issue comments ---- */
+
+  async getIssueComments(
+    prNumber: number,
+    perPage = 50,
+  ): Promise<Array<{ id: number; user: { login: string }; body: string }>> {
     const { data } = await this.api.get(
-      `/repos/${this.owner}/${this.repo}/git/trees/${ref}`,
-      { params: { recursive: '1' } },
+      `/repos/${this.owner}/${this.repo}/issues/${prNumber}/comments`,
+      { params: { per_page: perPage } },
     );
+
+    // Normalize: guard against deleted users (null user) and null bodies
+    return (data as Array<{ id: number; user?: { login: string } | null; body?: string | null }>)
+      .filter((c) => c.user != null)
+      .map((c) => ({
+        id: c.id,
+        user: { login: c.user!.login },
+        body: c.body ?? '',
+      }));
+  }
+
+  /* ---- File tree at ref ---- */
+
+  async getFileTree(ref: string): Promise<string[]> {
+    const { data } = await this.api.get(`/repos/${this.owner}/${this.repo}/git/trees/${ref}`, {
+      params: { recursive: '1' },
+    });
     return (data.tree as Array<{ path: string; type: string }>)
       .filter((e) => e.type === 'blob')
       .map((e) => e.path);

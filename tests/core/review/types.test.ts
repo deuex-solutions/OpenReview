@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { sortFindings } from './types.js';
-import type { ReviewFinding } from './types.js';
+import { sortFindings } from '../../../core/src/review/types.js';
+import type { ReviewFinding } from '../../../core/src/review/types.js';
 
 function makeFinding(
   severity: ReviewFinding['severity'],

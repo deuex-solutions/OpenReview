@@ -17,10 +17,7 @@ const LINTER_TIMEOUT_MS = 30_000;
  * Run all enabled linters in parallel on the given file list.
  * Linters that are not installed are silently skipped.
  */
-export async function runLinters(
-  files: string[],
-  repoPath: string,
-): Promise<ReviewFinding[]> {
+export async function runLinters(files: string[], repoPath: string): Promise<ReviewFinding[]> {
   if (files.length === 0) return [];
 
   const tasks: Array<Promise<ReviewFinding[]>> = [];
@@ -59,8 +56,7 @@ export function deduplicateFindings(
   for (const lf of linterFindings) {
     const matchIdx = merged.findIndex(
       (af) =>
-        af.file === lf.file &&
-        linesOverlap(af.startLine, af.endLine, lf.startLine, lf.endLine),
+        af.file === lf.file && linesOverlap(af.startLine, af.endLine, lf.startLine, lf.endLine),
     );
 
     if (matchIdx !== -1) {
@@ -114,12 +110,7 @@ async function runShellcheck(files: string[], cwd: string): Promise<ReviewFindin
   const shellFiles = files.filter((f) => /\.(sh|bash|zsh|ksh)$/.test(f));
   if (shellFiles.length === 0) return [];
 
-  const raw = await exec(
-    'shellcheck',
-    ['--format=json', ...shellFiles],
-    cwd,
-    'ShellCheck',
-  );
+  const raw = await exec('shellcheck', ['--format=json', ...shellFiles], cwd, 'ShellCheck');
   if (!raw) return [];
 
   return parseShellcheckOutput(raw);
@@ -297,7 +288,10 @@ async function exec(
       return null;
     }
 
-    console.warn(`[OpenReview] ${linterName} failed:`, error instanceof Error ? error.message : error);
+    console.warn(
+      `[OpenReview] ${linterName} failed:`,
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -306,12 +300,7 @@ function isExecError(err: unknown): err is NodeJS.ErrnoException & { stdout?: st
   return err instanceof Error && 'code' in err;
 }
 
-function linesOverlap(
-  aStart: number,
-  aEnd: number,
-  bStart: number,
-  bEnd: number,
-): boolean {
+function linesOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
   return aStart <= bEnd && bStart <= aEnd;
 }
 

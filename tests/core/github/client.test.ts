@@ -2,7 +2,7 @@ import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GitHubClient, parsePRUrl } from './client.js';
+import { GitHubClient, parsePRUrl } from '../../../core/src/github/client.js';
 
 /* ------------------------------------------------------------------ */
 /*  PR URL parsing                                                     */
@@ -100,9 +100,7 @@ describe('GitHubClient', () => {
         },
       ];
 
-      mockApi.get
-        .mockResolvedValueOnce({ data: page1 })
-        .mockResolvedValueOnce({ data: page2 });
+      mockApi.get.mockResolvedValueOnce({ data: page1 }).mockResolvedValueOnce({ data: page2 });
 
       const files = await client.getPRFiles(1);
       expect(files).toHaveLength(101);
@@ -141,6 +139,36 @@ describe('GitHubClient', () => {
       expect(mockApi.get).toHaveBeenCalledWith('/repos/acme/widget/contents/src/index.ts', {
         params: { ref: 'abc123' },
         headers: { Accept: 'application/vnd.github.v3.raw' },
+      });
+    });
+  });
+
+  describe('getIssueComments', () => {
+    it('returns normalized comments filtering out deleted users', async () => {
+      mockApi.get.mockResolvedValue({
+        data: [
+          { id: 1, user: { login: 'alice' }, body: 'Looks good' },
+          { id: 2, user: null, body: 'Ghost comment' },
+          { id: 3, user: { login: 'bob' }, body: null },
+        ],
+      });
+
+      const comments = await client.getIssueComments(42);
+      // Should filter out the null-user comment
+      expect(comments).toHaveLength(2);
+      expect(comments[0]).toEqual({ id: 1, user: { login: 'alice' }, body: 'Looks good' });
+      // Should normalize null body to empty string
+      expect(comments[1]).toEqual({ id: 3, user: { login: 'bob' }, body: '' });
+      expect(mockApi.get).toHaveBeenCalledWith('/repos/acme/widget/issues/42/comments', {
+        params: { per_page: 50 },
+      });
+    });
+
+    it('passes custom perPage parameter', async () => {
+      mockApi.get.mockResolvedValue({ data: [] });
+      await client.getIssueComments(10, 25);
+      expect(mockApi.get).toHaveBeenCalledWith('/repos/acme/widget/issues/10/comments', {
+        params: { per_page: 25 },
       });
     });
   });

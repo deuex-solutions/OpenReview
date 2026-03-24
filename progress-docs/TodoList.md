@@ -1,4 +1,5 @@
 # OpenReview — Phase-wise Deep To-Do List
+
 > Version 1.1 | 2026-03-17
 > Structure: Phase → Feature → Task
 > Audience: Solo Founder / Technical Lead
@@ -6,6 +7,7 @@
 ---
 
 ## Legend
+
 - `[ ]` Not started
 - `[~]` In progress
 - `[x]` Complete
@@ -20,9 +22,10 @@
 ## 1. Repository & Project Scaffold
 
 ### 1.1 Monorepo Setup
+
 - [x] Create GitHub repository `openreview` (public, MIT license)
 - [x] Initialize root `package.json` with pnpm workspaces (`core`, `cli`, `action`)
-- [x] Add `pnpm-lock.yaml` and `.gitignore` (node_modules, dist, .env, *.json.trace)
+- [x] Add `pnpm-lock.yaml` and `.gitignore` (node_modules, dist, .env, \*.json.trace)
 - [x] Create `tsconfig.base.json` with strict TypeScript settings (target ES2022, moduleResolution Node16)
 - [x] Create per-package `tsconfig.json` extending base in `core/`, `cli/`, `action/`
 - [x] Configure `tsdown` in each package for bundling (`dist/index.js`, CJS + ESM dual output)
@@ -36,6 +39,7 @@
 - [x] Verify pnpm workspaces resolve correctly: `pnpm --filter core build` etc.
 
 ### 1.2 Folder Structure
+
 - [x] Create `core/src/review/` directory
 - [x] Create `core/src/github/` directory
 - [x] Create `core/src/chat/` directory
@@ -52,6 +56,7 @@
 ## 2. Core Configuration System
 
 ### 2.1 Environment Variable Loader (`core/src/config/env.ts`)
+
 - [x] Install `dotenv` (v17.x) in `core`
 - [x] Export typed config object from `.env` with defaults
 - [x] Validate required vars at startup: at least one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`
@@ -63,6 +68,7 @@
 - [x] Unit test: config defaults, missing key errors, boolean parsing
 
 ### 2.2 Instruction File Reader (`core/src/config/instructions.ts`)
+
 - [x] Implement `findInstructionFiles(repoPath: string): Promise<InstructionFile[]>`
 - [x] Glob patterns to search: `**/REVIEW.md`, `**/AGENTS.md`, `**/CLAUDE.md`, `**/.cursorrules`, `**/.windsurfrules`
 - [x] For each file found: record the file path and its directory depth
@@ -77,6 +83,7 @@
 ## 3. GitHub API Client
 
 ### 3.1 GitHub Client (`core/src/github/client.ts`)
+
 - [x] Install `axios` (v1.13.x) in `core`
 - [x] Create `GitHubClient` class taking `{ token: string, owner: string, repo: string }`
 - [x] Implement `getPR(prNumber: number): Promise<PRMetadata>`
@@ -91,6 +98,7 @@
 - [x] Unit test: URL parsing, pagination logic (mock axios), rate limit detection
 
 ### 3.2 Diff Parser (`core/src/github/diff.ts`)
+
 - [x] Implement `parseDiff(rawDiff: string): ParsedDiff[]`
 - [x] `ParsedDiff`: `{ file, status, hunks: Hunk[], addedLines: Line[], deletedLines: Line[] }`
 - [x] Implement copy/move detection: `detectMovesAndCopies(diffs: ParsedDiff[]): MoveEvent[]`
@@ -102,6 +110,7 @@
 - [x] Unit test: parse standard unified diff, detect known move, detect known copy, respect globs
 
 ### 3.3 Comment Poster (`core/src/github/comments.ts`)
+
 - [x] Implement `postReview(prNumber, findings: ReviewFinding[]): Promise<void>`
   - [x] Batch all inline comments into single `POST /pulls/{pr}/reviews` call
   - [x] Review state: `COMMENT` (never auto-approve or request changes)
@@ -120,6 +129,7 @@
 ## 4. LLM Router & LangGraph Setup
 
 ### 4.1 LLM Router (`core/src/llm/router.ts`)
+
 - [x] Install `@langchain/core` (1.1.x), `@langchain/openai` (1.2.x), `@langchain/anthropic` (1.3.x), `@langchain/google-genai` (2.1.x), `@langchain/langgraph` (1.2.x) in `core`
 - [x] Implement `createLLM(modelId: string): BaseChatModel`
   - [x] Parse model string prefix: `gpt-*` → OpenAI, `claude-*` → Anthropic, `gemini-*` → Google
@@ -134,6 +144,7 @@
 ## 5. Fast Mode Review
 
 ### 5.1 Linter Orchestration (`core/src/review/linters.ts`)
+
 - [x] Implement `runLinters(files: string[], repoPath: string): Promise<ReviewFinding[]>`
 - [x] For each enabled linter, spawn child process with 30-second timeout
 - [x] Run all linters in parallel (`Promise.allSettled`)
@@ -148,6 +159,7 @@
 - [x] Unit test: each linter parser with sample output fixtures, timeout handling, binary-not-found handling
 
 ### 5.2 Fast Review Engine (`core/src/review/fast-review.ts`)
+
 - [x] Implement `runFastReview(pr: PRContext): Promise<ReviewFinding[]>`
 - [x] Build structured prompt:
   - System: role + instruction file content
@@ -165,6 +177,7 @@
 ## 6. RLM Deep Mode
 
 ### 6.1 Deno Sandbox (`core/src/sandbox/deno-runner.ts`)
+
 - [ ] Verify Deno 2.7+ installation at startup; throw descriptive error if missing
 - [ ] Implement `executeSandboxed(code: string, globals: Record<string, unknown>): Promise<SandboxResult>`
 - [ ] Inject `globals` as Deno script context (file contents, PR metadata)
@@ -175,6 +188,7 @@
 - [ ] Unit test: successful execution, timeout handling, read-only enforcement, syntax error handling
 
 ### 6.2 Hybrid Snapshot (`core/src/review/snapshot.ts`)
+
 - [ ] Implement `SnapshotBuilder` class
 - [ ] Constructor: load diff files immediately (pre-fetched from GitHub API)
 - [ ] Implement `getFile(path: string): Promise<string>` — lazy fetcher
@@ -188,6 +202,7 @@
 - [ ] Unit test: cache hit, cache miss + fetch, size limit enforcement
 
 ### 6.3 RLM Loop (`core/src/review/rlm-runner.ts`)
+
 - [ ] Define LangGraph state schema: `{ messages, iterations, llmCalls, files, findings, done }`
 - [ ] Implement `reason_node`: calls `createMainLLM()` with current state, returns reasoning + next action
 - [ ] Implement `code_writer_node`: extracts code block from reasoning output
@@ -209,6 +224,7 @@
 ## 7. JSON Trace Logger
 
 ### 7.1 Trace Logger (`core/src/trace/logger.ts`)
+
 - [ ] Implement `TraceLogger` class
 - [ ] Constructor: create trace file at `~/.openreview/traces/<timestamp>-<owner>-<repo>-<pr>.json`
 - [ ] Implement `logFastReview(input, output, duration)`: write fast review trace entry
@@ -224,6 +240,7 @@
 ## 8. Codebase-Aware Chat
 
 ### 8.1 Chat Handler (`core/src/chat/chat-handler.ts`)
+
 - [ ] Implement `handleChatMention(event: CommentEvent): Promise<void>`
 - [ ] Extract question from comment text (strip `@openreview` prefix)
 - [ ] Load conversation thread history for the PR (fetch prior comment chain)
@@ -235,6 +252,7 @@
 - [ ] Post final answer as GitHub comment reply in the thread
 
 ### 8.2 Follow-up Suggestions (`core/src/chat/suggestions.ts`)
+
 - [ ] Implement `generateSuggestions(answer: string, context: PRContext): Promise<string[]>`
 - [ ] Call `createSubLLM()` (cheaper model) with: answer text + PR context
 - [ ] Request 4–5 follow-up questions, each ≤ 8 words
@@ -246,6 +264,7 @@
 ## 9. Learnings Database
 
 ### 9.1 Learnings Store (`core/src/learnings/learnings-store.ts`)
+
 - [ ] Implement `LearningsStore` class for repo slug
 - [ ] File path: `~/.openreview/learnings/<org>-<repo>.json`
 - [ ] Create file + directory on first access
@@ -259,6 +278,7 @@
 - [ ] Unit test: add, list, delete, max limit pruning, trigger detection
 
 ### 9.2 Learning Injection
+
 - [ ] In `fast-review.ts` and `rlm-runner.ts`: load all learnings for repo, inject into system prompt
 - [ ] Format: `## Team Learnings\n- <learning 1>\n- <learning 2>...`
 - [ ] Cap learnings section at 2,000 tokens
@@ -269,6 +289,7 @@
 ## 10. CLI (`cli/`)
 
 ### 10.1 CLI Entry Point (`cli/src/main.ts`)
+
 - [ ] Install `commander` (v14.x) in `cli`
 - [ ] Set up top-level program: `openreview` with version from `package.json`
 - [ ] Register subcommands: `review`, `ask`, `serve`, `traces`
@@ -276,6 +297,7 @@
 - [ ] Handle uncaught errors: print friendly message, exit code 1
 
 ### 10.2 Review Command (`cli/src/commands/review.ts`)
+
 - [ ] `openreview review --url <PR-URL> [options]`
 - [ ] Options: `--mode <fast|rlm>` (default: fast), `--output <text|markdown|json>`, `--model <model-id>`, `--expert`, `--quiet`
 - [ ] Parse PR URL → extract owner, repo, PR number
@@ -286,22 +308,26 @@
 - [ ] Progress spinner (ora or similar) during review
 
 ### 10.3 Ask Command (`cli/src/commands/ask.ts`)
+
 - [ ] `openreview ask --repo <path> [--url <PR-URL>]`
 - [ ] Interactive REPL: readline loop
 - [ ] Commands: `reset` (clear history), `history` (show thread), `files` (list snapshot files), `exit`
 - [ ] Each input sent to chat handler, response printed with citations
 
 ### 10.4 Serve Command (`cli/src/commands/serve.ts`)
+
 - [ ] `openreview serve [--port <n>] [--host <host>]`
 - [ ] Start Express.js server (internal API + future web UI static files)
 - [ ] Print bound URL on start
 
 ### 10.5 Traces Command (`cli/src/commands/traces.ts`)
+
 - [ ] `openreview traces --pr <PR-URL>` — list all traces for a PR
 - [ ] `openreview traces --list` — list all traces (last 20)
 - [ ] `openreview traces --open <trace-file>` — pretty-print a trace
 
 ### 10.6 Output Formatter (`cli/src/formatter.ts`)
+
 - [ ] `formatText(findings)` — plain text output, one finding per line
 - [ ] `formatMarkdown(findings)` — severity-grouped markdown with badges
 - [ ] `formatJSON(findings)` — raw JSON array
@@ -311,18 +337,21 @@
 ## 11. GitHub Action (`action/`)
 
 ### 11.1 Action Definition (`action/action.yml`)
+
 - [ ] Define all inputs: `github-token`, `openai-api-key`, `anthropic-api-key`, `gemini-api-key`, `main-model`, `sub-model`, `max-files`, `review-drafts`
 - [ ] Set `runs: using: node24`
 - [ ] Set `main: dist/index.js`
 - [ ] Add `branding` (icon + color)
 
 ### 11.2 Action Entry Point (`action/src/index.ts`)
+
 - [ ] Read all inputs via `@actions/core` (v3.x)
 - [ ] Detect event type: `pull_request` vs `pull_request_review_comment`
 - [ ] Route to `pr-handler.ts` or `comment-handler.ts`
 - [ ] Wrap in try/catch: `core.setFailed(error.message)` on error
 
 ### 11.3 PR Handler (`action/src/pr-handler.ts`)
+
 - [ ] Extract PR number, owner, repo from `github.context.payload`
 - [ ] Skip if draft PR and `REVIEW_DRAFTS=false`
 - [ ] Skip if PR description contains `openreview: skip`
@@ -333,6 +362,7 @@
 - [ ] Store reviewed commit SHA in summary comment HTML tag
 
 ### 11.4 Comment Handler (`action/src/comment-handler.ts`)
+
 - [ ] Extract comment text, PR number, comment ID from payload
 - [ ] Skip if comment author is the bot itself (loop prevention)
 - [ ] Detect `@openreview rlm` → trigger RLM mode, post findings as review
@@ -695,4 +725,4 @@
 
 ---
 
-*To-Do List v1.1 — OpenReview — 2026-03-17*
+_To-Do List v1.1 — OpenReview — 2026-03-17_

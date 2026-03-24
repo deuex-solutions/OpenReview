@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { loadConfig, validateConfig } from './env.js';
+import { loadConfig, validateConfig } from '../../../core/src/config/env.js';
 
 describe('loadConfig', () => {
   const originalEnv = { ...process.env };
