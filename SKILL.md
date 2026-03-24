@@ -58,3 +58,25 @@ Review this PR for bugs and security issues: https://github.com/owner/repo/pull/
 ```
 Use the openreview skill to review https://github.com/owner/repo/pull/123
 ```
+
+### Codex
+
+```
+Run openreview in expert mode on https://github.com/owner/repo/pull/123
+```
+
+## API Key Verification
+
+Before running, verify your setup:
+
+```bash
+# Check that at least one LLM API key is set
+echo "OpenAI: ${OPENAI_API_KEY:+SET}"
+echo "Anthropic: ${ANTHROPIC_API_KEY:+SET}"
+echo "Gemini: ${GEMINI_API_KEY:+SET}"
+
+# Check GitHub access
+echo "GitHub: ${GITHUB_TOKEN:+SET}${GITHUB_PAT:+SET}"
+```
+
+At least one LLM key and one GitHub token are required.
