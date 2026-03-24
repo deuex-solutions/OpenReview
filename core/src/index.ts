@@ -25,6 +25,7 @@ export { sortFindings } from './review/types.js';
 export type {
   ReviewFinding,
   ReviewSummary,
+  ReviewTrace,
   PRContext,
   Citation,
   FindingCategory,

@@ -43,6 +43,18 @@ export interface ReviewSummary {
   totalFindings: number;
 }
 
+/** Diagnostic trace for observability into the review pipeline. */
+export interface ReviewTrace {
+  model: string;
+  rawFindingsCount: number;
+  postValidationCount: number;
+  droppedByCitation: Array<{ file: string; lines: string; title: string }>;
+  finalFindingsCount: number;
+  emptyReason?: 'llm_returned_empty' | 'all_filtered_by_citation' | 'structured_and_fallback_empty';
+  path: 'structured' | 'fallback' | 'structured+fallback';
+  durationMs: number;
+}
+
 /** Full context passed to the review engine. */
 export interface PRContext {
   owner: string;
