@@ -1,8 +1,9 @@
 # OpenReview — Milestone Document
 
-> Version 1.1 | 2026-03-17
+> Version 1.2 | 2026-03-24
 > 3 Phase-level Milestones + Post-MVP Roadmap
 > Audience: Solo Founder / Product Manager / Technical Lead
+> Status: Phase 1 Week 4 — 97.5% complete (launch checklist pending)
 
 ---
 
@@ -67,28 +68,32 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 - ✅ `comments.ts` migrated to canonical review types (single source of truth)
 - 94 tests passing, lint clean, typecheck clean, all 3 packages building
 
-#### Week 3 — RLM Mode + Chat + Learnings
+#### Week 3 — RLM Mode + Chat + Learnings ✅ COMPLETE (2026-03-22)
 
-- `core/sandbox/deno-runner.ts` — Deno sandbox executor (read-only)
-- `core/review/rlm-runner.ts` — LangGraph agentic loop (Reason → Code → Execute → Observe)
-- `core/review/snapshot.ts` — Hybrid snapshot builder (diff immediate, files on demand)
-- JSON trace logger (`~/.openreview/traces/`)
-- `core/chat/chat-handler.ts` — `@openreview <question>` handler
-- `core/chat/suggestions.ts` — Follow-up question generator (SUB_MODEL)
-- `core/learnings/learnings-store.ts` — JSON file CRUD, trigger phrase detection
-- Chat thread state management (stateful within PR)
+- ✅ `core/sandbox/deno-runner.ts` — Deno sandbox executor (`deno run` with strict permissions)
+- ✅ `core/review/rlm-runner.ts` — LangGraph agentic loop (Reason → Code → Execute → Observe)
+- ✅ `core/review/snapshot.ts` — Hybrid snapshot builder (diff immediate, files on demand)
+- ✅ JSON trace logger (`~/.openreview/traces/`) with secret scrubbing
+- ✅ `core/chat/chat-handler.ts` — `@openreview <question>` handler
+- ✅ `core/chat/suggestions.ts` — Follow-up question generator (SUB_MODEL)
+- ✅ `core/learnings/learnings-store.ts` — JSON file CRUD, trigger phrase detection
+- ✅ Chat thread state management (stateful within PR)
+- 320 tests passing, lint clean, typecheck clean
 
-#### Week 4 — CLI + Action + Polish
+#### Week 4 — CLI + Action + Polish ✅ 97.5% COMPLETE (2026-03-24)
 
-- `cli/` — Full CLI: `review`, `ask`, `serve`, `traces` commands
-- `action/` — GitHub Action (pr-handler.ts, comment-handler.ts)
-- `action/action.yml` — All inputs defined, permissions set
-- `.github/workflows/ci.yml` — Tests + lint on push/PR
-- `.github/workflows/release.yml` — npm publish + GitHub release on tag
-- `SKILL.md` — Claude Code / Cursor / Gemini CLI skill definition
-- End-to-end test suite against real GitHub test PRs
-- `README.md` — Setup guide, examples, configuration reference
-- Public launch: GitHub repo public, npm package published
+- ✅ `cli/` — Full CLI: `review`, `ask`, `serve`, `traces` commands (commander v14)
+- ✅ `cli/src/formatter.ts` — text, markdown, JSON output formats
+- ✅ `action/action.yml` — All inputs defined (github-token, LLM keys, model, max-files, review-drafts)
+- ✅ `action/src/index.ts` — Event router (pull_request → pr-handler, comment → comment-handler)
+- ✅ `action/src/pr-handler.ts` — Auto-review on PR open/sync, draft skip, acknowledgement, batch review
+- ✅ `action/src/comment-handler.ts` — @openreview commands (rlm, review, chat, learnings CRUD, loop prevention)
+- ✅ `SKILL.md` — Claude Code, Cursor, Gemini CLI, Codex examples + API key verification
+- ✅ `README.md` — Quick start, config reference, commands, review modes, instruction files
+- ✅ `CONTRIBUTING.md` — Setup, workflow, conventions, PR process
+- ✅ QA: 321 tests, 10/10 test PR bugs caught (18 findings), CLI E2E verified (fast + RLM)
+- ✅ Bug fixes from manual testing: auth scheme detection, structured output, severity normalization, file-type-aware prompting, sandbox `deno run`, RLM recursion limit, temperature control
+- [ ] Launch checklist: npm publish, GitHub Marketplace, public announcement (deferred)
 
 #### Week 5–6 — Impact Analysis (Phase 1 MVP)
 

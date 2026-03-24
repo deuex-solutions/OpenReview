@@ -1,8 +1,9 @@
 # OpenReview — Phase-wise Deep To-Do List
 
-> Version 1.1 | 2026-03-17
+> Version 1.2 | 2026-03-24
 > Structure: Phase → Feature → Task
 > Audience: Solo Founder / Technical Lead
+> Status: Phase 1 Weeks 1-4 complete. Sections 10-14 done (97.5%). Launch checklist pending.
 
 ---
 
@@ -286,140 +287,140 @@
 
 ---
 
-## 10. CLI (`cli/`)
+## 10. CLI (`cli/`) ✅ COMPLETE (2026-03-24)
 
 ### 10.1 CLI Entry Point (`cli/src/main.ts`)
 
-- [ ] Install `commander` (v14.x) in `cli`
-- [ ] Set up top-level program: `openreview` with version from `package.json`
-- [ ] Register subcommands: `review`, `ask`, `serve`, `traces`
-- [ ] Handle `--help` and `--version` flags
-- [ ] Handle uncaught errors: print friendly message, exit code 1
+- [x] Install `commander` (v14.x) in `cli`
+- [x] Set up top-level program: `openreview` with version from `package.json`
+- [x] Register subcommands: `review`, `ask`, `serve`, `traces`
+- [x] Handle `--help` and `--version` flags
+- [x] Handle uncaught errors: print friendly message, exit code 1
 
 ### 10.2 Review Command (`cli/src/commands/review.ts`)
 
-- [ ] `openreview review --url <PR-URL> [options]`
-- [ ] Options: `--mode <fast|rlm>` (default: fast), `--output <text|markdown|json>`, `--model <model-id>`, `--expert`, `--quiet`
-- [ ] Parse PR URL → extract owner, repo, PR number
-- [ ] Validate `.env` config loaded
-- [ ] Run `runFastReview()` or `runRLM()` based on `--mode`
-- [ ] `--expert` flag: adds SOLID/security/quality review instructions to system prompt
-- [ ] Format output via `formatter.ts` and print to stdout
-- [ ] Progress spinner (ora or similar) during review
+- [x] `openreview review --url <PR-URL> [options]`
+- [x] Options: `--mode <fast|rlm>` (default: fast), `--output <text|markdown|json>`, `--model <model-id>`, `--expert`, `--quiet`
+- [x] Parse PR URL → extract owner, repo, PR number
+- [x] Validate `.env` config loaded
+- [x] Run `runFastReview()` or `runRLM()` based on `--mode`
+- [x] `--expert` flag: adds SOLID/security/quality review instructions to system prompt
+- [x] Format output via `formatter.ts` and print to stdout
+- [x] Progress output to stderr for clean piping
 
 ### 10.3 Ask Command (`cli/src/commands/ask.ts`)
 
-- [ ] `openreview ask --repo <path> [--url <PR-URL>]`
-- [ ] Interactive REPL: readline loop
-- [ ] Commands: `reset` (clear history), `history` (show thread), `files` (list snapshot files), `exit`
-- [ ] Each input sent to chat handler, response printed with citations
+- [x] `openreview ask --repo <path> [--url <PR-URL>]`
+- [x] Interactive REPL: readline loop
+- [x] Commands: `reset` (clear history), `history` (show thread), `files` (list snapshot files), `exit`
+- [x] Each input sent to chat handler, response printed with citations
 
 ### 10.4 Serve Command (`cli/src/commands/serve.ts`)
 
-- [ ] `openreview serve [--port <n>] [--host <host>]`
-- [ ] Start Express.js server (internal API + future web UI static files)
-- [ ] Print bound URL on start
+- [x] `openreview serve [--port <n>] [--host <host>]`
+- [x] Start Express.js server (internal API + future web UI static files)
+- [x] Print bound URL on start
 
 ### 10.5 Traces Command (`cli/src/commands/traces.ts`)
 
-- [ ] `openreview traces --pr <PR-URL>` — list all traces for a PR
-- [ ] `openreview traces --list` — list all traces (last 20)
-- [ ] `openreview traces --open <trace-file>` — pretty-print a trace
+- [x] `openreview traces --pr <PR-URL>` — list all traces for a PR
+- [x] `openreview traces --list` — list all traces (last 20)
+- [x] `openreview traces --open <trace-file>` — pretty-print a trace
 
 ### 10.6 Output Formatter (`cli/src/formatter.ts`)
 
-- [ ] `formatText(findings)` — plain text output, one finding per line
-- [ ] `formatMarkdown(findings)` — severity-grouped markdown with badges
-- [ ] `formatJSON(findings)` — raw JSON array
+- [x] `formatText(findings)` — plain text output, one finding per line
+- [x] `formatMarkdown(findings)` — severity-grouped markdown with badges
+- [x] `formatJSON(findings)` — raw JSON array
 
 ---
 
-## 11. GitHub Action (`action/`)
+## 11. GitHub Action (`action/`) ✅ COMPLETE (2026-03-24)
 
 ### 11.1 Action Definition (`action/action.yml`)
 
-- [ ] Define all inputs: `github-token`, `openai-api-key`, `anthropic-api-key`, `gemini-api-key`, `main-model`, `sub-model`, `max-files`, `review-drafts`
-- [ ] Set `runs: using: node24`
-- [ ] Set `main: dist/index.js`
-- [ ] Add `branding` (icon + color)
+- [x] Define all inputs: `github-token`, `openai-api-key`, `anthropic-api-key`, `gemini-api-key`, `main-model`, `sub-model`, `max-files`, `review-drafts`
+- [x] Set `runs: using: node24`
+- [x] Set `main: dist/index.mjs`
+- [x] Add `branding` (icon: eye, color: blue)
 
 ### 11.2 Action Entry Point (`action/src/index.ts`)
 
-- [ ] Read all inputs via `@actions/core` (v3.x)
-- [ ] Detect event type: `pull_request` vs `pull_request_review_comment`
-- [ ] Route to `pr-handler.ts` or `comment-handler.ts`
-- [ ] Wrap in try/catch: `core.setFailed(error.message)` on error
+- [x] Read all inputs via `@actions/core` (v3.x)
+- [x] Detect event type: `pull_request` vs `pull_request_review_comment`
+- [x] Route to `pr-handler.ts` or `comment-handler.ts`
+- [x] Wrap in try/catch: `core.setFailed(error.message)` on error
 
 ### 11.3 PR Handler (`action/src/pr-handler.ts`)
 
-- [ ] Extract PR number, owner, repo from `github.context.payload`
-- [ ] Skip if draft PR and `REVIEW_DRAFTS=false`
-- [ ] Skip if PR description contains `openreview: skip`
-- [ ] Check for incremental review: compare current commit SHA vs last reviewed SHA (HTML tag in summary comment)
-- [ ] Post "Review started..." acknowledgement comment
-- [ ] Run linters + Fast mode review
-- [ ] Post batch review + summary comment
-- [ ] Store reviewed commit SHA in summary comment HTML tag
+- [x] Extract PR number, owner, repo from `github.context.payload`
+- [x] Skip if draft PR and `REVIEW_DRAFTS=false`
+- [x] Skip if PR description contains `openreview: skip`
+- [x] Check for incremental review: compare current commit SHA vs last reviewed SHA (HTML tag in summary comment)
+- [x] Post "Review started..." acknowledgement comment
+- [x] Run linters + Fast mode review
+- [x] Post batch review + summary comment
+- [x] Store reviewed commit SHA in summary comment HTML tag
 
 ### 11.4 Comment Handler (`action/src/comment-handler.ts`)
 
-- [ ] Extract comment text, PR number, comment ID from payload
-- [ ] Skip if comment author is the bot itself (loop prevention)
-- [ ] Detect `@openreview rlm` → trigger RLM mode, post findings as review
-- [ ] Detect `@openreview <question>` (anything else) → trigger chat handler
-- [ ] Detect trigger phrases for learnings → call `LearningsStore.add()`
-- [ ] Detect `@openreview list learnings` → post learnings list as comment
-- [ ] Detect `@openreview forget: <description>` → delete matching learning
+- [x] Extract comment text, PR number, comment ID from payload
+- [x] Skip if comment author is the bot itself (loop prevention)
+- [x] Detect `@openreview rlm` → trigger RLM mode, post findings as review
+- [x] Detect `@openreview <question>` (anything else) → trigger chat handler
+- [x] Detect trigger phrases for learnings → call `LearningsStore.add()`
+- [x] Detect `@openreview list learnings` → post learnings list as comment
+- [x] Detect `@openreview forget: <description>` → delete matching learning
 
 ---
 
-## 12. SKILL.md
+## 12. SKILL.md ✅ COMPLETE (2026-03-24)
 
-- [ ] Write `SKILL.md` at repo root
-- [ ] Sections: description, prerequisites, usage, examples, `--expert` mode description
-- [ ] Verify Gemini/OpenAI/Anthropic API key step
-- [ ] Verify GitHub PAT or GITHUB_TOKEN availability step
-- [ ] Example commands for Claude Code, Cursor, Gemini CLI, Codex
-- [ ] `--expert` flag documentation: SOLID, security, quality deep-dive
-
----
-
-## 13. README & Documentation
-
-- [ ] Write `README.md` — setup in < 5 minutes
-  - [ ] What is OpenReview (1 paragraph)
-  - [ ] Quick start: GitHub Action setup (copy-paste workflow YAML)
-  - [ ] Quick start: CLI setup (`npx openreview review --url ...`)
-  - [ ] Configuration reference (`.env` variables table)
-  - [ ] Commands reference table
-  - [ ] How it works (Fast mode, RLM mode, Chat)
-  - [ ] Instruction files (REVIEW.md, AGENTS.md, etc.)
-  - [ ] Contributing guide link
-  - [ ] License badge + link
-- [ ] Write `REVIEW.md` — OpenReview's own review rules (dogfooding)
-- [ ] Write `CONTRIBUTING.md` — fork, branch, PR, test requirements
+- [x] Write `SKILL.md` at repo root
+- [x] Sections: description, prerequisites, usage, examples, `--expert` mode description
+- [x] Verify Gemini/OpenAI/Anthropic API key step
+- [x] Verify GitHub PAT or GITHUB_TOKEN availability step
+- [x] Example commands for Claude Code, Cursor, Gemini CLI, Codex
+- [x] `--expert` flag documentation: SOLID, security, quality deep-dive
 
 ---
 
-## 14. Testing & QA
+## 13. README & Documentation ✅ COMPLETE (2026-03-24)
 
-- [ ] Unit tests for every module above (target: > 80% coverage)
-- [ ] Integration test: `npx openreview review --url <public-test-PR>` end-to-end
-- [ ] Test PRs: create 10 test PRs with known bugs in different languages
-  - [ ] 2x TypeScript (logic bug, security issue)
-  - [ ] 2x Python (logic bug, hardcoded secret)
-  - [ ] 2x Shell (bash bug)
-  - [ ] 2x Terraform/IaC (misconfiguration)
-  - [ ] 2x multi-file (copy/move scenario)
-- [ ] Validate: ≥ 8 out of 10 bugs caught
-- [ ] Validate: Fast mode completes in < 60s on all 10 test PRs
-- [ ] Manual test: `@openreview rlm` via GitHub comment
-- [ ] Manual test: `@openreview <question>` via GitHub comment
-- [ ] Manual test: learnings CRUD via GitHub comment commands
+- [x] Write `README.md` — setup in < 5 minutes
+  - [x] What is OpenReview (1 paragraph)
+  - [x] Quick start: GitHub Action setup (copy-paste workflow YAML)
+  - [x] Quick start: CLI setup (`npx openreview review --url ...`)
+  - [x] Configuration reference (`.env` variables table)
+  - [x] Commands reference table
+  - [x] How it works (Fast mode, RLM mode, Chat)
+  - [x] Instruction files (REVIEW.md, AGENTS.md, etc.)
+  - [x] Contributing guide link
+  - [x] License badge + link
+- [x] Write `REVIEW.md` — OpenReview's own review rules (dogfooding)
+- [x] Write `CONTRIBUTING.md` — fork, branch, PR, test requirements
 
 ---
 
-## 15. Launch Checklist
+## 14. Testing & QA ✅ 85% COMPLETE (2026-03-24)
+
+- [x] Unit tests for every module above (target: > 80% coverage) — 321 tests passing
+- [x] Integration test: `npx openreview review --url <public-test-PR>` end-to-end — CLI works (fast + RLM)
+- [x] Test PRs: create 10 test PRs with known bugs in different languages — PR #6
+  - [x] 2x TypeScript (logic bug, security issue)
+  - [x] 2x Python (logic bug, hardcoded secret)
+  - [x] 2x Shell (bash bug, security)
+  - [x] 2x Terraform/IaC (misconfiguration)
+  - [x] 2x multi-file (copy/move scenario)
+- [x] Validate: ≥ 8 out of 10 bugs caught — **10/10 caught (18 findings)**
+- [x] Validate: Fast mode completes in < 60s on all 10 test PRs — all under 27s
+- [!] Manual test: `@openreview rlm` via GitHub comment — deferred to launch (requires live Action)
+- [!] Manual test: `@openreview <question>` via GitHub comment — deferred to launch
+- [!] Manual test: learnings CRUD via GitHub comment commands — deferred to launch
+
+---
+
+## 15. Launch Checklist (DEFERRED)
 
 - [ ] GitHub repository made public
 - [ ] `npm publish` — `openreview` package published

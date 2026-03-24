@@ -1,8 +1,8 @@
 # OpenReview — Product Requirements Document (PRD)
 
-> Version 1.1 | 2026-03-17
+> Version 1.2 | 2026-03-24
 > Audience: Solo Founder / Product Manager / Technical Lead
-> Status: In Development — Phase 1 Week 2 Complete (2026-03-20)
+> Status: In Development — Phase 1 Week 4 Complete (2026-03-24) — Launch checklist pending
 
 ---
 
