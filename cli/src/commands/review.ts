@@ -1,4 +1,5 @@
 import {
+  CommentPoster,
   GitHubClient,
   SnapshotBuilder,
   loadConfig,
@@ -21,6 +22,7 @@ export function registerReviewCommand(program: Command): void {
     .option('--output <format>', 'Output format: text, markdown, or json', 'text')
     .option('--model <model>', 'Override LLM model')
     .option('--expert', 'Comprehensive SOLID/security/quality review')
+    .option('--submit', 'Post findings as GitHub PR comment')
     .option('--quiet', 'Suppress progress output')
     .action(async (opts) => {
       try {
@@ -28,7 +30,6 @@ export function registerReviewCommand(program: Command): void {
         validateConfig(cfg);
 
         if (opts.model) {
-          // Override model at runtime
           (cfg as unknown as Record<string, unknown>).mainModel = opts.model;
         }
 
@@ -92,7 +93,6 @@ export function registerReviewCommand(program: Command): void {
             }
           });
 
-          // Build summary manually for RLM
           const bySeverity = { severe: 0, 'non-severe': 0, investigate: 0, informational: 0 };
           for (const f of findings) {
             bySeverity[f.severity]++;
@@ -114,7 +114,7 @@ export function registerReviewCommand(program: Command): void {
           summary = result.summary;
         }
 
-        // Format output
+        // Format and print output
         const format = opts.output as string;
         let output: string;
         if (format === 'json') {
@@ -126,6 +126,25 @@ export function registerReviewCommand(program: Command): void {
         }
 
         process.stdout.write(output + '\n');
+
+        // Post to GitHub if --submit flag is set
+        if (opts.submit) {
+          if (!opts.quiet) {
+            process.stderr.write('Posting review to GitHub...\n');
+          }
+
+          const poster = new CommentPoster(client);
+
+          if (findings.length > 0) {
+            await poster.postReview(prNumber, findings);
+          }
+
+          await poster.postSummaryComment(prNumber, summary);
+
+          process.stderr.write(
+            `✅ Review posted on PR #${prNumber} (${findings.length} finding${findings.length === 1 ? '' : 's'})\n`,
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         process.stderr.write(`Error: ${msg}\n`);
