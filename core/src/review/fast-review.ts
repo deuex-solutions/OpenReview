@@ -103,19 +103,120 @@ function normalizeCategory(raw: string): 'bug' | 'flag' {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Non-reviewable file patterns                                       */
+/* ------------------------------------------------------------------ */
+
+const SKIP_PATTERNS = [
+  /^yarn\.lock$/,
+  /^pnpm-lock\.yaml$/,
+  /^package-lock\.json$/,
+  /\.lock$/,
+  /\.min\.(js|css)$/,
+  /\.map$/,
+  /\.snap$/,
+  /\.svg$/,
+  /\.png$/,
+  /\.jpg$/,
+  /\.jpeg$/,
+  /\.gif$/,
+  /\.ico$/,
+  /\.woff2?$/,
+  /\.ttf$/,
+  /\.eot$/,
+  /\.pdf$/,
+  /dist\//,
+  /\.generated\./,
+  /vendor\//,
+];
+
+function isReviewableFile(filename: string): boolean {
+  return !SKIP_PATTERNS.some((pattern) => pattern.test(filename));
+}
+
+/* ------------------------------------------------------------------ */
+/*  Diff chunking                                                      */
+/* ------------------------------------------------------------------ */
+
+/** Max chars per LLM call (~40K chars ≈ ~10K tokens, safe for any model) */
+const MAX_CHUNK_CHARS = 40_000;
+
+interface DiffChunk {
+  diff: string;
+  files: string[];
+}
+
+/**
+ * Split a unified diff into chunks that fit within the LLM token budget.
+ * Each chunk contains complete file diffs (never splits a file mid-diff).
+ */
+function chunkDiff(rawDiff: string, files: string[]): DiffChunk[] {
+  // Split diff by file boundaries
+  const fileDiffs: Array<{ file: string; diff: string }> = [];
+  const parts = rawDiff.split(/^(?=diff --git )/m);
+
+  for (const part of parts) {
+    if (!part.trim()) continue;
+    const fileMatch = /^diff --git a\/(.+?) b\/(.+?)$/m.exec(part);
+    if (fileMatch) {
+      fileDiffs.push({ file: fileMatch[2], diff: part });
+    }
+  }
+
+  // If the whole diff fits in one chunk, return as-is
+  if (rawDiff.length <= MAX_CHUNK_CHARS) {
+    return [{ diff: rawDiff, files }];
+  }
+
+  // Build chunks that stay under the limit
+  const chunks: DiffChunk[] = [];
+  let currentDiff = '';
+  let currentFiles: string[] = [];
+
+  for (const fd of fileDiffs) {
+    // Skip non-reviewable files
+    if (!isReviewableFile(fd.file)) continue;
+
+    // If adding this file would exceed the limit, flush current chunk
+    if (currentDiff.length + fd.diff.length > MAX_CHUNK_CHARS && currentDiff.length > 0) {
+      chunks.push({ diff: currentDiff, files: [...currentFiles] });
+      currentDiff = '';
+      currentFiles = [];
+    }
+
+    // If a single file exceeds the limit, truncate it
+    if (fd.diff.length > MAX_CHUNK_CHARS) {
+      const truncated = fd.diff.slice(0, MAX_CHUNK_CHARS - 200) + '\n... [truncated — file too large]\n';
+      chunks.push({ diff: truncated, files: [fd.file] });
+      continue;
+    }
+
+    currentDiff += fd.diff;
+    currentFiles.push(fd.file);
+  }
+
+  // Flush remaining
+  if (currentDiff.length > 0) {
+    chunks.push({ diff: currentDiff, files: currentFiles });
+  }
+
+  return chunks.length > 0 ? chunks : [{ diff: rawDiff.slice(0, MAX_CHUNK_CHARS), files }];
+}
+
+/* ------------------------------------------------------------------ */
 /*  Fast Review Engine                                                 */
 /* ------------------------------------------------------------------ */
 
 /**
- * Run a single-shot Fast mode review on a PR.
+ * Run a Fast mode review on a PR.
  *
  * Pipeline:
- * 1. Run enabled linters on changed files
- * 2. Send prompt to LLM (structured output → raw fallback → empty-retry)
- * 3. Normalize findings (enum values, field names)
- * 4. Validate citations against diff (snap-to-nearest)
- * 5. Merge with linter findings (deduplicate)
- * 6. Return sorted findings + diagnostic trace
+ * 1. Filter non-reviewable files (lock files, generated, binaries)
+ * 2. Chunk large diffs into LLM-sized batches
+ * 3. Review each chunk (structured output → raw fallback)
+ * 4. Run enabled linters on changed files
+ * 5. Validate citations against diff (snap-to-nearest)
+ * 6. Merge with linter findings (deduplicate)
+ * 7. Return sorted findings + diagnostic trace
  */
 export async function runFastReview(
   pr: PRContext,
@@ -132,17 +233,79 @@ export async function runFastReview(
     durationMs: 0,
   };
 
-  // 1. Run linters (if we have a local checkout)
-  const linterFindings = repoPath ? await runLinters(pr.files, repoPath) : [];
+  // 1. Filter non-reviewable files
+  const reviewableFiles = pr.files.filter(isReviewableFile);
 
-  // 2. Build prompt and call LLM with fallback chain
+  // 2. Run linters (if we have a local checkout)
+  const linterFindings = repoPath ? await runLinters(reviewableFiles, repoPath) : [];
+
+  // 3. Chunk the diff for LLM processing
+  const chunks = chunkDiff(pr.diff, reviewableFiles);
+
+  // 4. Review each chunk
+  let allAiFindings: ReviewFinding[] = [];
+
+  for (const chunk of chunks) {
+    const chunkPR: PRContext = {
+      ...pr,
+      diff: chunk.diff,
+      files: chunk.files,
+    };
+    const chunkFindings = await reviewChunk(chunkPR, linterFindings, trace);
+    allAiFindings = allAiFindings.concat(chunkFindings);
+  }
+
+  trace.rawFindingsCount = allAiFindings.length;
+
+  // 5. Validate citations with snap-to-nearest
+  const diffLines = extractDiffLineMap(pr.diff);
+  const { validated, dropped } = validateWithSnap(allAiFindings, diffLines);
+
+  trace.postValidationCount = validated.length;
+  trace.droppedByCitation = dropped.map((f) => ({
+    file: f.file,
+    lines: `${f.startLine}-${f.endLine}`,
+    title: f.title,
+  }));
+
+  // 6. Merge and deduplicate
+  const merged = deduplicateFindings(validated, linterFindings);
+
+  // 7. Sort by severity
+  const sorted = sortFindings(merged);
+
+  const duration = Date.now() - start;
+  trace.finalFindingsCount = sorted.length;
+  trace.durationMs = duration;
+
+  if (sorted.length === 0) {
+    if (allAiFindings.length === 0) {
+      trace.emptyReason = 'structured_and_fallback_empty';
+    } else {
+      trace.emptyReason = 'all_filtered_by_citation';
+    }
+  }
+
+  const summary = buildSummary(sorted, pr.files.length, duration);
+
+  return { findings: sorted, summary, trace };
+}
+
+/**
+ * Review a single diff chunk through the LLM pipeline.
+ */
+async function reviewChunk(
+  pr: PRContext,
+  linterFindings: ReviewFinding[],
+  trace: ReviewTrace,
+): Promise<ReviewFinding[]> {
   const prompt = buildPrompt(pr, linterFindings);
   let aiFindings: ReviewFinding[];
 
   // Path A: Try structured output first
   try {
     aiFindings = await invokeStructured(prompt);
-    trace.path = 'structured';
+    if (trace.path === 'structured') trace.path = 'structured';
   } catch {
     // Path B: Fallback to raw LLM + resilient parser
     try {
@@ -153,17 +316,20 @@ export async function runFastReview(
     trace.path = 'fallback';
   }
 
-  // Path C: If structured output returned empty, retry with raw parser
-  // (the model might have valid findings but returned empty due to schema constraints)
-  if (aiFindings.length === 0 && trace.path === 'structured') {
-    const rawRetry = await invokeRawWithParser(prompt, pr.files);
-    if (rawRetry.length > 0) {
-      aiFindings = rawRetry;
-      trace.path = 'structured+fallback';
+  // Path C: If structured returned empty, retry with raw parser
+  if (aiFindings.length === 0) {
+    try {
+      const rawRetry = await invokeRawWithParser(prompt, pr.files);
+      if (rawRetry.length > 0) {
+        aiFindings = rawRetry;
+        trace.path = trace.path + '+fallback';
+      }
+    } catch {
+      // Best effort
     }
   }
 
-  // Path D: If still empty on non-code files, retry with a focused re-prompt
+  // Path D: If still empty on non-code files, retry with focused prompt
   const fileType = detectDiffFileType(pr.files);
   if (aiFindings.length === 0 && fileType !== 'code') {
     try {
@@ -171,47 +337,14 @@ export async function runFastReview(
       const retryFindings = await invokeRawWithParser(focusedPrompt, pr.files);
       if (retryFindings.length > 0) {
         aiFindings = retryFindings;
-        trace.path = (trace.path + '+focused-retry') as ReviewTrace['path'];
+        trace.path = trace.path + '+focused';
       }
     } catch {
       // Best effort
     }
   }
 
-  trace.rawFindingsCount = aiFindings.length;
-
-  // 3. Validate citations with snap-to-nearest
-  const diffLines = extractDiffLineMap(pr.diff);
-  const { validated, dropped } = validateWithSnap(aiFindings, diffLines);
-
-  trace.postValidationCount = validated.length;
-  trace.droppedByCitation = dropped.map((f) => ({
-    file: f.file,
-    lines: `${f.startLine}-${f.endLine}`,
-    title: f.title,
-  }));
-
-  // 4. Merge and deduplicate
-  const merged = deduplicateFindings(validated, linterFindings);
-
-  // 5. Sort by severity
-  const sorted = sortFindings(merged);
-
-  const duration = Date.now() - start;
-  trace.finalFindingsCount = sorted.length;
-  trace.durationMs = duration;
-
-  if (sorted.length === 0) {
-    if (aiFindings.length === 0) {
-      trace.emptyReason = 'structured_and_fallback_empty';
-    } else {
-      trace.emptyReason = 'all_filtered_by_citation';
-    }
-  }
-
-  const summary = buildSummary(sorted, pr.files.length, duration);
-
-  return { findings: sorted, summary, trace };
+  return aiFindings;
 }
 
 /* ------------------------------------------------------------------ */
