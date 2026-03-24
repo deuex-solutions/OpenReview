@@ -4,7 +4,7 @@ import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 
 import { config } from '../config/env.js';
 import { createMainLLM } from '../llm/router.js';
-import { executeSandboxed } from '../sandbox/deno-runner.js';
+import { executeSandboxed, verifyDenoInstallation } from '../sandbox/deno-runner.js';
 
 import type { SnapshotBuilder } from './snapshot.js';
 import type { PRContext, ReviewFinding } from './types.js';
@@ -60,23 +60,36 @@ export type RLMEventHandler = (event: RLMEvent) => void;
 /*  Node implementations                                               */
 /* ------------------------------------------------------------------ */
 
-function buildReasonNode(pr: PRContext, snapshot: SnapshotBuilder, onEvent?: RLMEventHandler) {
+function buildReasonNode(
+  pr: PRContext,
+  snapshot: SnapshotBuilder,
+  onEvent?: RLMEventHandler,
+  sandboxAvailable = true,
+) {
   const llm = createMainLLM();
 
   return async (state: RLMStateType) => {
     const iteration = state.iterations + 1;
     onEvent?.({ type: 'iteration', iteration, message: `Starting iteration ${iteration}` });
 
-    const systemPrompt = buildRLMSystemPrompt(pr);
+    const systemPrompt = buildRLMSystemPrompt(pr, sandboxAvailable);
+    const remaining = config.maxIterations - iteration;
+    const urgency =
+      remaining <= 2
+        ? '\n⚠️ You are running low on iterations. Call finish_review NOW unless you have a critical investigation remaining.'
+        : remaining <= 4
+          ? '\n⏳ Iterations are limited — focus on the most impactful findings and converge soon.'
+          : '';
+
     const messages = [
       { role: 'system', content: systemPrompt },
       ...state.messages,
       {
         role: 'human',
         content:
-          `Iteration ${iteration}. ` +
+          `Iteration ${iteration} of ${config.maxIterations}.${urgency}\n` +
           'Analyze the code and either:\n' +
-          '1. Write a code block to investigate further (will be executed in a Deno sandbox)\n' +
+          '1. Write a CONCISE code block to investigate further (will be executed in a Deno sandbox)\n' +
           '2. Call finish_review if you have enough information\n\n' +
           'Available files in GLOBALS: ' +
           Object.keys(state.files).join(', ') +
@@ -169,10 +182,16 @@ function buildSandboxNode(onEvent?: RLMEventHandler) {
 
     const result = await executeSandboxed(codeBlock, state.files);
 
+    const sandboxMsg =
+      result.exitCode === 0
+        ? `Sandbox: exit=0 duration=${result.duration}ms`
+        : `Sandbox: exit=${result.exitCode} duration=${result.duration}ms` +
+          (result.stderr ? ` | ${result.stderr.slice(0, 200)}` : '');
+
     onEvent?.({
       type: 'sandbox',
       iteration: state.iterations,
-      message: `Sandbox: exit=${result.exitCode} duration=${result.duration}ms`,
+      message: sandboxMsg,
     });
 
     const output = [
@@ -289,6 +308,15 @@ export async function runRLM(
   snapshot: SnapshotBuilder,
   onEvent?: RLMEventHandler,
 ): Promise<ReviewFinding[]> {
+  // Check if Deno is available for sandbox execution
+  let sandboxAvailable = false;
+  try {
+    await verifyDenoInstallation();
+    sandboxAvailable = true;
+  } catch {
+    // Deno not installed — RLM will operate in reasoning-only mode
+  }
+
   // Pre-load diff files into the files map
   const initialFiles: Record<string, string> = {};
   const diffPaths = snapshot.getCachedPaths();
@@ -300,7 +328,7 @@ export async function runRLM(
   }
 
   const graph = new StateGraph(RLMState)
-    .addNode('reason', buildReasonNode(pr, snapshot, onEvent))
+    .addNode('reason', buildReasonNode(pr, snapshot, onEvent, sandboxAvailable))
     .addNode('code_writer', buildCodeWriterNode())
     .addNode('sandbox', buildSandboxNode(onEvent))
     .addNode('observe', buildObserveNode())
@@ -316,6 +344,10 @@ export async function runRLM(
     .addEdge('finalize', END)
     .compile();
 
+  // Each iteration traverses ~4 nodes (reason→code_writer→sandbox→observe),
+  // plus START and finalize. Set recursionLimit high enough for maxIterations.
+  const recursionLimit = config.maxIterations * 5 + 10;
+
   const result = await graph.invoke({
     messages: [
       {
@@ -330,7 +362,7 @@ export async function runRLM(
     files: initialFiles,
     findings: [],
     done: false,
-  });
+  }, { recursionLimit });
 
   return result.findings;
 }
@@ -339,29 +371,53 @@ export async function runRLM(
 /*  Prompts                                                            */
 /* ------------------------------------------------------------------ */
 
-function buildRLMSystemPrompt(pr: PRContext): string {
+function buildRLMSystemPrompt(pr: PRContext, sandboxAvailable: boolean): string {
   const parts = [
     'You are OpenReview RLM (Reason-Loop-Measure), a deep code analysis agent.',
     'You review code by iteratively reasoning, writing analysis scripts, and observing results.',
     '',
-    'Your workflow:',
-    '1. Reason about the code and identify areas to investigate',
-    '2. Write TypeScript code blocks that will be executed in a Deno sandbox',
-    '3. The code has access to `GLOBALS` object containing file contents',
-    '4. Observe sandbox output and continue investigating or finalize',
+  ];
+
+  if (sandboxAvailable) {
+    parts.push(
+      'Your workflow:',
+      '1. Reason about the code and identify areas to investigate',
+      '2. Write TypeScript code blocks that will be executed in a Deno sandbox',
+      '3. The code has access to `GLOBALS` object containing file contents',
+      '4. Observe sandbox output and continue investigating or finalize',
+      '',
+      'Write investigative code that:',
+      '- Parses file contents from GLOBALS',
+      '- Checks for patterns, anti-patterns, or bugs',
+      '- Outputs findings to stdout',
+    );
+  } else {
+    parts.push(
+      '⚠️ SANDBOX UNAVAILABLE: Deno is not installed. Do NOT write code blocks — they will fail.',
+      'Instead, analyze the code through reasoning only:',
+      '1. Read the diff and file contents provided in GLOBALS carefully',
+      '2. Reason about bugs, security issues, logic errors, and quality problems',
+      '3. Call finish_review once you have identified all issues',
+      '',
+      'Focus on thorough reasoning since you cannot execute verification scripts.',
+    );
+  }
+
+  parts.push(
     '',
     'To request additional files, output: FETCH_FILE: <path>',
     'To finish the review, output: finish_review',
     '',
-    'Write investigative code that:',
-    '- Parses file contents from GLOBALS',
-    '- Checks for patterns, anti-patterns, or bugs',
-    '- Outputs findings to stdout',
+    'Efficiency guidelines:',
+    '- Each iteration costs time. Investigate multiple concerns per iteration when possible.',
+    '- Write focused, concise scripts — avoid unnecessary complexity.',
+    '- Call finish_review as soon as you have sufficient evidence. Do not exhaust all iterations.',
+    '- Aim to complete your analysis in 4-6 iterations for typical PRs.',
     '',
     `Repository: ${pr.owner}/${pr.repo}`,
     `PR #${pr.prNumber}: ${pr.metadata.title}`,
     `Author: ${pr.metadata.author}`,
-  ];
+  );
 
   if (pr.instructions) {
     parts.push('', '## Project Review Instructions', pr.instructions);

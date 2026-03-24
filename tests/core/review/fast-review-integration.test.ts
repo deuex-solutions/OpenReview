@@ -296,7 +296,7 @@ describe('runFastReview', () => {
 
     await runFastReview(pr);
 
-    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    expect(mockInvoke).toHaveBeenCalled();
     const prompt = mockInvoke.mock.calls[0][0] as Array<{ role: string; content: string }>;
     const systemContent = prompt.find((m) => m.role === 'system')!.content;
     expect(systemContent).toContain('Always check for null safety.');

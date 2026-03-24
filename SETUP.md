@@ -163,8 +163,8 @@ All settings are configured via `.env`. Copy `.env.example` to get started.
 
 | Variable          | Default   | Description                         |
 | ----------------- | --------- | ----------------------------------- |
-| `MAX_ITERATIONS`  | `20`      | Max RLM loop iterations             |
-| `MAX_LLM_CALLS`   | `25`      | Max total LLM calls per RLM session |
+| `MAX_ITERATIONS`  | `12`      | Max RLM loop iterations             |
+| `MAX_LLM_CALLS`   | `35`      | Max total LLM calls per RLM session |
 | `MAX_FILES`       | `100`     | Max files per review                |
 | `MAX_FILE_BYTES`  | `200000`  | Max bytes per individual file       |
 | `MAX_TOTAL_BYTES` | `5000000` | Max total snapshot size             |

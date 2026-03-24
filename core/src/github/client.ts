@@ -56,6 +56,47 @@ interface RetryConfig extends InternalAxiosRequestConfig {
   _retryCount?: number;
 }
 
+function attachAuthErrorInterceptor(client: AxiosInstance): void {
+  client.interceptors.response.use(undefined, (error: AxiosError) => {
+    const status = error.response?.status;
+    const url = error.config?.url ?? '';
+
+    if (status === 401) {
+      return Promise.reject(
+        new Error(
+          'GitHub API authentication failed (401). Your token may be invalid or expired. ' +
+            'Ensure GITHUB_TOKEN or GITHUB_PAT is set to a valid token.',
+        ),
+      );
+    }
+
+    if (status === 403 && error.response?.headers['x-ratelimit-remaining'] !== '0') {
+      return Promise.reject(
+        new Error(
+          `GitHub API access forbidden (403) for ${url}. ` +
+            'Your token may lack the required scopes. ' +
+            'For private repos, classic PATs need the "repo" scope; ' +
+            'fine-grained PATs need "Contents: Read" and "Pull requests: Read/Write" permissions.',
+        ),
+      );
+    }
+
+    if (status === 404 && (url.includes('/pulls/') || url.includes('/repos/'))) {
+      return Promise.reject(
+        new Error(
+          `GitHub API returned 404 for ${url}. ` +
+            'This can mean: (1) the PR or repository does not exist, ' +
+            '(2) the repository is private and your token lacks access. ' +
+            'For private repos, ensure your GITHUB_PAT has the "repo" scope (classic PAT) ' +
+            'or repository access (fine-grained PAT).',
+        ),
+      );
+    }
+
+    return Promise.reject(error);
+  });
+}
+
 function attachRateLimitInterceptor(client: AxiosInstance): void {
   client.interceptors.response.use(undefined, async (error: AxiosError) => {
     if (error.response?.status === 403 && error.response.headers['x-ratelimit-remaining'] === '0') {
@@ -98,16 +139,21 @@ export class GitHubClient {
     this.owner = opts.owner;
     this.repo = opts.repo;
 
+    // Classic PATs (ghp_) require "token" scheme; fine-grained PATs (github_pat_),
+    // GitHub App installation tokens, and OAuth tokens use "Bearer".
+    const authScheme = opts.token.startsWith('ghp_') ? 'token' : 'Bearer';
+
     this.api = axios.create({
       baseURL: 'https://api.github.com',
       timeout: 30_000,
       headers: {
-        Authorization: `Bearer ${opts.token}`,
+        Authorization: `${authScheme} ${opts.token}`,
         Accept: 'application/vnd.github.v3+json',
         'X-GitHub-Api-Version': '2022-11-28',
       },
     });
 
+    attachAuthErrorInterceptor(this.api);
     attachRateLimitInterceptor(this.api);
     attachRetryInterceptor(this.api);
   }
@@ -116,7 +162,13 @@ export class GitHubClient {
   static fromConfig(owner: string, repo: string): GitHubClient {
     const token = config.githubToken || config.githubPat;
     if (!token) {
-      throw new Error('No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT.');
+      throw new Error(
+        'No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT in your .env file.\n' +
+          'For public repos, a classic PAT with zero scopes is sufficient.\n' +
+          'For private repos, the PAT needs the "repo" scope (classic) or ' +
+          '"Contents: Read" + "Pull requests: Read/Write" (fine-grained).\n' +
+          'Create one at: https://github.com/settings/tokens',
+      );
     }
     return new GitHubClient({ token, owner, repo });
   }
@@ -126,7 +178,13 @@ export class GitHubClient {
     const { owner, repo, prNumber } = parsePRUrl(url);
     const tok = token || config.githubToken || config.githubPat;
     if (!tok) {
-      throw new Error('No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT.');
+      throw new Error(
+        'No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT in your .env file.\n' +
+          'For public repos, a classic PAT with zero scopes is sufficient.\n' +
+          'For private repos, the PAT needs the "repo" scope (classic) or ' +
+          '"Contents: Read" + "Pull requests: Read/Write" (fine-grained).\n' +
+          'Create one at: https://github.com/settings/tokens',
+      );
     }
     return { client: new GitHubClient({ token: tok, owner, repo }), prNumber };
   }

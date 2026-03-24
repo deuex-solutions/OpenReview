@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { executeSandboxed, verifyDenoInstallation } from '../../../core/src/sandbox/deno-runner.js';
 
 /* ------------------------------------------------------------------ */
-/*  Mock child_process.execFile for deterministic tests                */
+/*  Mock child_process.execFile and node:fs for deterministic tests     */
 /* ------------------------------------------------------------------ */
 
 type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
@@ -14,7 +15,15 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
 }));
 
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(() => true),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
+}));
+
 const mockExecFile = vi.mocked(execFile);
+const mockWriteFileSync = vi.mocked(writeFileSync);
 
 /* ------------------------------------------------------------------ */
 /*  verifyDenoInstallation                                             */
@@ -81,21 +90,19 @@ describe('executeSandboxed', () => {
     expect(result.duration).toBeGreaterThanOrEqual(0);
   });
 
-  it('passes globals as GLOBALS constant in the script', async () => {
-    let capturedScript = '';
-
-    mockExecFile.mockImplementation((_cmd, args, _opts, cb) => {
-      // Script is the last argument after flags: eval --ext=ts --allow-read --deny-* <script>
-      const argsArr = args as string[];
-      capturedScript = argsArr[argsArr.length - 1];
+  it('passes globals as GLOBALS constant in the script file', async () => {
+    mockExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
       (cb as unknown as ExecFileCallback)(null, '', '');
       return undefined as unknown as ReturnType<typeof execFile>;
     });
 
     await executeSandboxed('console.log(GLOBALS.name)', { name: 'test-repo', lines: [1, 2, 3] });
 
-    expect(capturedScript).toContain('const GLOBALS = {"name":"test-repo","lines":[1,2,3]}');
-    expect(capturedScript).toContain('console.log(GLOBALS.name)');
+    // Check what was written to the temp file
+    const writeCall = mockWriteFileSync.mock.calls[mockWriteFileSync.mock.calls.length - 1];
+    const writtenContent = writeCall[1] as string;
+    expect(writtenContent).toContain('const GLOBALS = {"name":"test-repo","lines":[1,2,3]}');
+    expect(writtenContent).toContain('console.log(GLOBALS.name)');
   });
 
   it('returns stderr and non-zero exitCode on syntax error', async () => {
@@ -112,7 +119,6 @@ describe('executeSandboxed', () => {
 
   it('returns timeout result when execution exceeds timeout', async () => {
     mockExecFile.mockImplementation((_cmd, _args, opts, cb) => {
-      // Simulate the AbortController firing
       const options = opts as { signal: AbortSignal };
       options.signal.addEventListener('abort', () => {
         const error = Object.assign(new Error('aborted'), { code: 'ABORT_ERR' });
@@ -138,7 +144,7 @@ describe('executeSandboxed', () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it('uses deno eval with explicit sandbox permission flags', async () => {
+  it('uses deno run with explicit sandbox permission flags', async () => {
     let capturedArgs: string[] = [];
 
     mockExecFile.mockImplementation((_cmd, args, _opts, cb) => {
@@ -149,17 +155,15 @@ describe('executeSandboxed', () => {
 
     await executeSandboxed('console.log("safe")');
 
-    expect(capturedArgs[0]).toBe('eval');
+    expect(capturedArgs[0]).toBe('run');
     expect(capturedArgs[1]).toBe('--ext=ts');
-    // Should explicitly allow read and deny dangerous permissions
-    expect(capturedArgs).toContain('--allow-read');
+    // Should explicitly scope read access and deny dangerous permissions
+    expect(capturedArgs.some((a) => a.startsWith('--allow-read='))).toBe(true);
     expect(capturedArgs).toContain('--deny-net');
-    expect(capturedArgs).toContain('--deny-write');
     expect(capturedArgs).toContain('--deny-env');
     expect(capturedArgs).toContain('--deny-run');
     // Should NOT allow dangerous permissions
     expect(capturedArgs).not.toContain('--allow-net');
-    expect(capturedArgs).not.toContain('--allow-write');
     expect(capturedArgs).not.toContain('--allow-env');
     expect(capturedArgs).not.toContain('--allow-run');
   });

@@ -25,6 +25,7 @@ export { sortFindings } from './review/types.js';
 export type {
   ReviewFinding,
   ReviewSummary,
+  ReviewTrace,
   PRContext,
   Citation,
   FindingCategory,
@@ -57,6 +58,7 @@ export type { SandboxResult } from './sandbox/deno-runner.js';
 export {
   createLLM,
   createMainLLM,
+  createStructuredLLM,
   createSubLLM,
   detectProvider,
   streamChat,

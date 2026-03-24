@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 import { config as loadDotenv } from 'dotenv';
 
-loadDotenv();
+loadDotenv({ quiet: true });
 
 function envString(key: string, defaultValue: string): string {
   return process.env[key]?.trim() || defaultValue;
@@ -103,8 +103,8 @@ export function loadConfig(): OpenReviewConfig {
     mainModel: envString('MAIN_MODEL', 'gpt-4o'),
     subModel: envString('SUB_MODEL', 'gpt-4o-mini'),
 
-    maxIterations: envInt('MAX_ITERATIONS', 20),
-    maxLlmCalls: envInt('MAX_LLM_CALLS', 25),
+    maxIterations: envInt('MAX_ITERATIONS', 12),
+    maxLlmCalls: envInt('MAX_LLM_CALLS', 35),
     maxFiles: envInt('MAX_FILES', 100),
     maxFileBytes: envInt('MAX_FILE_BYTES', 200_000),
     maxTotalBytes: envInt('MAX_TOTAL_BYTES', 5_000_000),

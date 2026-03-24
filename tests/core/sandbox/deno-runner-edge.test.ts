@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { executeSandboxed, verifyDenoInstallation } from '../../../core/src/sandbox/deno-runner.js';
 
 /* ------------------------------------------------------------------ */
-/*  Mock child_process.execFile for deterministic tests                */
+/*  Mock child_process.execFile and node:fs for deterministic tests     */
 /* ------------------------------------------------------------------ */
 
 type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
@@ -14,7 +15,15 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
 }));
 
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(() => true),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
+}));
+
 const mockExecFile = vi.mocked(execFile);
+const mockWriteFileSync = vi.mocked(writeFileSync);
 
 /* ------------------------------------------------------------------ */
 /*  executeSandboxed — edge cases                                      */
@@ -22,11 +31,7 @@ const mockExecFile = vi.mocked(execFile);
 
 describe('executeSandboxed — edge cases', () => {
   it('handles empty code string', async () => {
-    let capturedScript = '';
-
-    mockExecFile.mockImplementation((_cmd, args, _opts, cb) => {
-      const argsArr = args as string[];
-      capturedScript = argsArr[argsArr.length - 1];
+    mockExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
       (cb as unknown as ExecFileCallback)(null, '', '');
       return undefined as unknown as ReturnType<typeof execFile>;
     });
@@ -35,16 +40,14 @@ describe('executeSandboxed — edge cases', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe('');
-    // The script should still contain the GLOBALS preamble followed by empty code
-    expect(capturedScript).toContain('const GLOBALS = {}');
+    // Check the written script file contains the GLOBALS preamble
+    const writeCall = mockWriteFileSync.mock.calls[mockWriteFileSync.mock.calls.length - 1];
+    const writtenContent = writeCall[1] as string;
+    expect(writtenContent).toContain('const GLOBALS = {}');
   });
 
   it('handles empty globals object (default)', async () => {
-    let capturedScript = '';
-
-    mockExecFile.mockImplementation((_cmd, args, _opts, cb) => {
-      const argsArr = args as string[];
-      capturedScript = argsArr[argsArr.length - 1];
+    mockExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
       (cb as unknown as ExecFileCallback)(null, '', '');
       return undefined as unknown as ReturnType<typeof execFile>;
     });
@@ -52,20 +55,19 @@ describe('executeSandboxed — edge cases', () => {
     const result = await executeSandboxed('console.log("hi")');
 
     expect(result.exitCode).toBe(0);
-    expect(capturedScript).toContain('const GLOBALS = {};');
-    expect(capturedScript).toContain('console.log("hi")');
+    const writeCall = mockWriteFileSync.mock.calls[mockWriteFileSync.mock.calls.length - 1];
+    const writtenContent = writeCall[1] as string;
+    expect(writtenContent).toContain('const GLOBALS = {};');
+    expect(writtenContent).toContain('console.log("hi")');
   });
 
   it('handles very large globals (big JSON)', async () => {
-    let capturedScript = '';
     const largeGlobals: Record<string, unknown> = {};
     for (let i = 0; i < 1000; i++) {
       largeGlobals[`key_${i}`] = `value_${i}_${'x'.repeat(100)}`;
     }
 
-    mockExecFile.mockImplementation((_cmd, args, _opts, cb) => {
-      const argsArr = args as string[];
-      capturedScript = argsArr[argsArr.length - 1];
+    mockExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
       (cb as unknown as ExecFileCallback)(null, '', '');
       return undefined as unknown as ReturnType<typeof execFile>;
     });
@@ -73,10 +75,12 @@ describe('executeSandboxed — edge cases', () => {
     const result = await executeSandboxed('console.log(GLOBALS)', largeGlobals);
 
     expect(result.exitCode).toBe(0);
-    expect(capturedScript).toContain('const GLOBALS = {');
-    expect(capturedScript).toContain('"key_999"');
+    const writeCall = mockWriteFileSync.mock.calls[mockWriteFileSync.mock.calls.length - 1];
+    const writtenContent = writeCall[1] as string;
+    expect(writtenContent).toContain('const GLOBALS = {');
+    expect(writtenContent).toContain('"key_999"');
     // Verify the globals are valid JSON by checking the script parses
-    const globalsJson = capturedScript.split('const GLOBALS = ')[1].split(';\n\n')[0];
+    const globalsJson = writtenContent.split('const GLOBALS = ')[1].split(';\n\n')[0];
     expect(() => JSON.parse(globalsJson)).not.toThrow();
   });
 

@@ -1,0 +1,41 @@
+name: 'OpenReview'
+description: 'AI-powered code review with agentic reasoning, linter integration, and full GitHub sync'
+author: 'Deuex Solutions'
+
+branding:
+  icon: 'eye'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access (usually secrets.GITHUB_TOKEN)'
+    required: true
+  openai-api-key:
+    description: 'OpenAI API key (required if using GPT models)'
+    required: false
+  anthropic-api-key:
+    description: 'Anthropic API key (required if using Claude models)'
+    required: false
+  gemini-api-key:
+    description: 'Google Gemini API key (required if using Gemini models)'
+    required: false
+  main-model:
+    description: 'Primary LLM model for review and chat'
+    required: false
+    default: 'gpt-4o'
+  sub-model:
+    description: 'Secondary LLM model for summarization and suggestions'
+    required: false
+    default: 'gpt-4o-mini'
+  max-files:
+    description: 'Maximum number of files to review per PR'
+    required: false
+    default: '100'
+  review-drafts:
+    description: 'Whether to review draft PRs'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'node24'
+  main: 'dist/index.mjs'
