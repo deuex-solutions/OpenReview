@@ -71,7 +71,7 @@ export async function handleComment(context: Context): Promise<void> {
     core.info('Triggering RLM deep review');
     await poster.postAcknowledgement(
       prNumber,
-      '🔬 **OpenReview** — Deep review started (RLM mode)... this may take 2-5 minutes.',
+      '[INFO] **OpenReview** — Deep review started (RLM mode)... this may take 2-5 minutes.',
     );
 
     try {
@@ -113,12 +113,12 @@ export async function handleComment(context: Context): Promise<void> {
 
       await poster.postAcknowledgement(
         prNumber,
-        `✅ **OpenReview** — RLM deep review complete. Found ${findings.length} issue(s).`,
+        `[SUCCESS] **OpenReview** — RLM deep review complete. Found ${findings.length} issue(s).`,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       core.error(`RLM review failed: ${msg}`);
-      await poster.postAcknowledgement(prNumber, `❌ **OpenReview** — RLM review failed: ${msg}`);
+      await poster.postAcknowledgement(prNumber, `[ERROR] **OpenReview** — RLM review failed: ${msg}`);
     }
     return;
   }
@@ -126,8 +126,7 @@ export async function handleComment(context: Context): Promise<void> {
   // Route: @openreview review → fresh fast review
   if (mentionText.toLowerCase() === 'review') {
     core.info('Triggering fresh fast review via comment');
-    await poster.postAcknowledgement(prNumber, '🔍 **OpenReview** — Fresh review started...');
-
+    await poster.postAcknowledgement(prNumber, '[INFO] **OpenReview** — Fresh review started...');
     try {
       const prMeta = await client.getPR(prNumber);
       const files = await client.getPRFiles(prNumber);
@@ -158,7 +157,7 @@ export async function handleComment(context: Context): Promise<void> {
       await poster.postSummaryComment(prNumber, summary);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      await poster.postAcknowledgement(prNumber, `❌ **OpenReview** — Review failed: ${msg}`);
+      await poster.postAcknowledgement(prNumber, `[ERROR] **OpenReview** — Review failed: ${msg}`);
     }
     return;
   }
@@ -190,7 +189,7 @@ export async function handleComment(context: Context): Promise<void> {
 
     if (match) {
       await store.delete(match.id);
-      await poster.postChatReply(prNumber, `✅ Forgot: "${match.finding}"`);
+      await poster.postChatReply(prNumber, `[SUCCESS] Forgot: "${match.finding}"`);
     } else {
       await poster.postChatReply(prNumber, `No matching learning found for: "${desc}"`);
     }
@@ -246,7 +245,7 @@ export async function handleComment(context: Context): Promise<void> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     core.error(`Chat handler failed: ${msg}`);
-    await poster.postChatReply(prNumber, `❌ **OpenReview** — Failed to answer: ${msg}`);
+    await poster.postChatReply(prNumber, `[ERROR] **OpenReview** — Failed to answer: ${msg}`);
   }
 }
 

@@ -4,11 +4,11 @@ import type { ReviewFinding, ReviewSummary } from '@openreview/core';
 /*  Text output                                                        */
 /* ------------------------------------------------------------------ */
 
-const SEVERITY_ICONS: Record<string, string> = {
-  severe: '🔴',
-  'non-severe': '🟠',
-  investigate: '🔍',
-  informational: 'ℹ️',
+const SEVERITY_ICONS: Record<FindingSeverity, string> = {
+  severe: '[CRITICAL]',
+  'non-severe': '[MODERATE]',
+  investigate: '[FLAG]',
+  informational: '[INFO]',
 };
 
 export function formatText(findings: ReviewFinding[], summary: ReviewSummary): string {
@@ -24,7 +24,7 @@ export function formatText(findings: ReviewFinding[], summary: ReviewSummary): s
   }
 
   for (const f of findings) {
-    const icon = SEVERITY_ICONS[f.severity] ?? '❓';
+    const icon = SEVERITY_ICONS[f.severity] ?? '[?]';
     const source = f.source === 'linter' ? ` [${f.linterName}]` : '';
     lines.push(`${icon} ${f.severity.toUpperCase()} ${f.file}:${f.startLine} — ${f.title}${source}`);
     lines.push(`  ${f.explanation}`);
@@ -50,10 +50,10 @@ export function formatMarkdown(findings: ReviewFinding[], summary: ReviewSummary
   lines.push('');
   lines.push('| Severity | Count |');
   lines.push('|---|---|');
-  lines.push(`| 🔴 Bug — Severe | ${summary.findingsBySeverity.severe} |`);
-  lines.push(`| 🟠 Bug — Non-severe | ${summary.findingsBySeverity['non-severe']} |`);
-  lines.push(`| 🔍 Investigate | ${summary.findingsBySeverity.investigate} |`);
-  lines.push(`| ℹ️ Informational | ${summary.findingsBySeverity.informational} |`);
+  lines.push(`| [CRITICAL] Bug — Severe | ${summary.findingsBySeverity.severe} |`);
+  lines.push(`| [MODERATE] Bug — Non-severe | ${summary.findingsBySeverity['non-severe']} |`);
+  lines.push(`| [FLAG] Investigate | ${summary.findingsBySeverity.investigate} |`);
+  lines.push(`| [INFO] Informational | ${summary.findingsBySeverity.informational} |`);
   lines.push('');
 
   if (findings.length === 0) {
@@ -70,7 +70,7 @@ export function formatMarkdown(findings: ReviewFinding[], summary: ReviewSummary
   }
 
   for (const [severity, group] of grouped) {
-    const icon = SEVERITY_ICONS[severity] ?? '❓';
+    const icon = SEVERITY_ICONS[severity] ?? '[?]';
     lines.push(`### ${icon} ${severity}`);
     lines.push('');
     for (const f of group) {

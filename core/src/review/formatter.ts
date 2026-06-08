@@ -5,10 +5,10 @@ import type { FindingSeverity, ReviewFinding, ReviewSummary } from './types.js';
 /* ------------------------------------------------------------------ */
 
 const SEVERITY_BADGES: Record<FindingSeverity, string> = {
-  severe: '🔴 **Bug — Severe**',
-  'non-severe': '🟠 **Bug — Non-severe**',
-  investigate: '🔍 **Flag — Investigate**',
-  informational: 'ℹ️ **Flag — Informational**',
+  severe: '[CRITICAL] **Bug — Severe**',
+  'non-severe': '[MODERATE] **Bug — Non-severe**',
+  investigate: '[FLAG] **Investigate**',
+  informational: '[INFO] **Informational**',
 };
 
 const SUMMARY_MARKER = '<!-- openreview-summary -->';
@@ -22,7 +22,7 @@ export function formatSummaryComment(summary: ReviewSummary): string {
   md += `**Files reviewed:** ${summary.filesReviewed} | **Duration:** ${summary.duration} | **Mode:** ${summary.mode}\n\n`;
 
   if (summary.totalFindings === 0) {
-    md += '✅ No issues found.\n';
+    md += '[SUCCESS] No issues found.\n';
   } else {
     md += '| Severity | Count |\n|---|---|\n';
 

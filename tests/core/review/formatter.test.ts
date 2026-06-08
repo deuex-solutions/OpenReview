@@ -41,22 +41,22 @@ function makeSummary(overrides: Partial<ReviewSummary> = {}): ReviewSummary {
 describe('formatInlineComment', () => {
   it('renders severe bug badge', () => {
     const result = formatInlineComment(makeFinding({ severity: 'severe' }));
-    expect(result).toContain('🔴 **Bug — Severe**');
+    expect(result).toContain('[CRITICAL] **Bug — Severe**');
   });
 
   it('renders non-severe bug badge', () => {
     const result = formatInlineComment(makeFinding({ severity: 'non-severe' }));
-    expect(result).toContain('🟠 **Bug — Non-severe**');
+    expect(result).toContain('[MODERATE] **Bug — Non-severe**');
   });
 
   it('renders investigate flag badge', () => {
     const result = formatInlineComment(makeFinding({ severity: 'investigate' }));
-    expect(result).toContain('🔍 **Flag — Investigate**');
+    expect(result).toContain('[FLAG] **Investigate**');
   });
 
   it('renders informational flag badge', () => {
     const result = formatInlineComment(makeFinding({ severity: 'informational' }));
-    expect(result).toContain('ℹ️ **Flag — Informational**');
+    expect(result).toContain('[INFO] **Informational**');
   });
 
   it('includes title and explanation', () => {
@@ -150,7 +150,7 @@ describe('formatSummaryComment', () => {
 
   it('shows no-issues message for zero findings', () => {
     const result = formatSummaryComment(makeSummary({ totalFindings: 0 }));
-    expect(result).toContain('✅ No issues found.');
+    expect(result).toContain('[SUCCESS] No issues found.');
     expect(result).not.toContain('| Severity');
   });
 
@@ -161,10 +161,10 @@ describe('formatSummaryComment', () => {
         findingsBySeverity: { severe: 1, 'non-severe': 2, investigate: 1, informational: 2 },
       }),
     );
-    expect(result).toContain('🔴 **Bug — Severe**');
-    expect(result).toContain('🟠 **Bug — Non-severe**');
-    expect(result).toContain('🔍 **Flag — Investigate**');
-    expect(result).toContain('ℹ️ **Flag — Informational**');
+    expect(result).toContain('[CRITICAL] **Bug — Severe**');
+    expect(result).toContain('[MODERATE] **Bug — Non-severe**');
+    expect(result).toContain('[FLAG] **Investigate**');
+    expect(result).toContain('[INFO] **Informational**');
     expect(result).toContain('**Total:** 6 findings');
   });
 
@@ -175,10 +175,10 @@ describe('formatSummaryComment', () => {
         findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 0, informational: 0 },
       }),
     );
-    expect(result).toContain('🔴 **Bug — Severe**');
-    expect(result).not.toContain('🟠 **Bug — Non-severe**');
-    expect(result).not.toContain('🔍 **Flag — Investigate**');
-    expect(result).not.toContain('ℹ️ **Flag — Informational**');
+    expect(result).toContain('[CRITICAL] **Bug — Severe**');
+    expect(result).not.toContain('[MODERATE] **Bug — Non-severe**');
+    expect(result).not.toContain('[FLAG] **Investigate**');
+    expect(result).not.toContain('[INFO] **Informational**');
   });
 
   it('uses singular "finding" for count of 1', () => {
@@ -227,10 +227,12 @@ describe('formatSummaryComment', () => {
         findingsBySeverity: { severe: 1, 'non-severe': 1, investigate: 1, informational: 1 },
       }),
     );
-    const severeIdx = result.indexOf('Bug — Severe');
-    const nonSevereIdx = result.indexOf('Bug — Non-severe');
-    const investigateIdx = result.indexOf('Flag — Investigate');
-    const infoIdx = result.indexOf('Flag — Informational');
+
+    const severeIdx = result.indexOf('[CRITICAL] **Bug — Severe**');
+    const nonSevereIdx = result.indexOf('[MODERATE] **Bug — Non-severe**');
+    const investigateIdx = result.indexOf('[FLAG] **Investigate**');
+    const infoIdx = result.indexOf('[INFO] **Informational**');
+
     expect(severeIdx).toBeLessThan(nonSevereIdx);
     expect(nonSevereIdx).toBeLessThan(investigateIdx);
     expect(investigateIdx).toBeLessThan(infoIdx);

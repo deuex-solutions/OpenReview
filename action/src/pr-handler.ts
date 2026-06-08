@@ -49,7 +49,7 @@ export async function handlePullRequest(context: Context): Promise<void> {
   // Post acknowledgement
   await poster.postAcknowledgement(
     prNumber,
-    '🔍 **OpenReview** — Review started... results will appear shortly.',
+    '[INFO] **OpenReview** — Review started... results will appear shortly.',
   );
 
   try {
@@ -98,7 +98,7 @@ export async function handlePullRequest(context: Context): Promise<void> {
     // Post error comment so the user knows
     await poster.postAcknowledgement(
       prNumber,
-      `❌ **OpenReview** — Review failed: ${msg}`,
+      `[ERROR] **OpenReview** — Review failed: ${msg}`,
     );
 
     throw err;
