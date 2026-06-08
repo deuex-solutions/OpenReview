@@ -88,3 +88,9 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
 export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {
   return [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Impact Analysis Types (Re-exports)                                 */
+/* ------------------------------------------------------------------ */
+
+export * from '../impact/types';

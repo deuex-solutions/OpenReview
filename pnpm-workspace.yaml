@@ -1,4 +1,11 @@
 packages:
-  - 'core'
-  - 'cli'
-  - 'action'
+  - core
+  - cli
+  - action
+
+ignoredBuiltDependencies:
+  - tree-sitter
+  - tree-sitter-javascript
+  - tree-sitter-python
+  - tree-sitter-typescript
+  - unrs-resolver
