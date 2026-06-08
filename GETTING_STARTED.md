@@ -398,15 +398,13 @@ The bot will remember and avoid repeating the same mistake. Learnings are stored
 
 ## Troubleshooting
 
-### "No GitHub token found"
+### "No GitHub token found" (Optional for public repos)
 
-```
-Error: No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT in your .env file.
-```
+OpenReview can now review **public repositories** without a token. However, you will be subject to strict GitHub API rate limits (60 requests per hour).
 
-**Fix:** Set `GITHUB_PAT` in your `.env` file or pass `GITHUB_TOKEN` as an environment variable.
+**Recommendation:** Set `GITHUB_PAT` in your `.env` file to increase your rate limit to 5,000 requests per hour.
 - For public repos: a classic PAT with **zero scopes** works.
-- For private repos: the PAT needs the `repo` scope.
+- For private repos: the PAT **must** have the `repo` scope.
 - Create one at [github.com/settings/tokens](https://github.com/settings/tokens).
 
 ### "requires at least one LLM API key"

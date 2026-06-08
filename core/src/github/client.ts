@@ -29,7 +29,7 @@ export interface PRFile {
 }
 
 export interface GitHubClientOptions {
-  token: string;
+  token?: string;
   owner: string;
   repo: string;
 }
@@ -71,23 +71,34 @@ function attachAuthErrorInterceptor(client: AxiosInstance): void {
     }
 
     if (status === 403 && error.response?.headers['x-ratelimit-remaining'] !== '0') {
+      const isUnauthenticated = !error.config?.headers?.Authorization;
+      const extraMsg = isUnauthenticated
+        ? '\nYou are currently unauthenticated. Public repos have a very low rate limit (60/hr). ' +
+          'Provide a GITHUB_TOKEN to increase this limit.'
+        : '';
+      
       return Promise.reject(
         new Error(
           `GitHub API access forbidden (403) for ${url}. ` +
-            'Your token may lack the required scopes. ' +
-            'For private repos, classic PATs need the "repo" scope; ' +
+            'Your token may lack the required scopes.' + extraMsg +
+            '\nFor private repos, classic PATs need the "repo" scope; ' +
             'fine-grained PATs need "Contents: Read" and "Pull requests: Read/Write" permissions.',
         ),
       );
     }
 
     if (status === 404 && (url.includes('/pulls/') || url.includes('/repos/'))) {
+      const isUnauthenticated = !error.config?.headers?.Authorization;
+      const extraMsg = isUnauthenticated
+        ? '\nYou are currently unauthenticated. This repository might be private.'
+        : '';
+
       return Promise.reject(
         new Error(
           `GitHub API returned 404 for ${url}. ` +
             'This can mean: (1) the PR or repository does not exist, ' +
-            '(2) the repository is private and your token lacks access. ' +
-            'For private repos, ensure your GITHUB_PAT has the "repo" scope (classic PAT) ' +
+            '(2) the repository is private and your token lacks access.' + extraMsg +
+            '\nFor private repos, ensure your GITHUB_PAT has the "repo" scope (classic PAT) ' +
             'or repository access (fine-grained PAT).',
         ),
       );
@@ -102,6 +113,12 @@ function attachRateLimitInterceptor(client: AxiosInstance): void {
     if (error.response?.status === 403 && error.response.headers['x-ratelimit-remaining'] === '0') {
       const resetEpoch = Number(error.response.headers['x-ratelimit-reset']);
       const waitMs = Math.max(0, resetEpoch * 1000 - Date.now()) + 1000;
+      
+      process.stderr.write(
+        `⚠️ GitHub API rate limit exceeded. Waiting ${Math.ceil(waitMs / 1000)}s for reset...\n` +
+        'Tip: Set GITHUB_TOKEN to increase your rate limit from 60 to 5,000 requests per hour.\n'
+      );
+
       await new Promise((r) => setTimeout(r, waitMs));
       return client.request(error.config!);
     }
@@ -139,18 +156,22 @@ export class GitHubClient {
     this.owner = opts.owner;
     this.repo = opts.repo;
 
-    // Classic PATs (ghp_) require "token" scheme; fine-grained PATs (github_pat_),
-    // GitHub App installation tokens, and OAuth tokens use "Bearer".
-    const authScheme = opts.token.startsWith('ghp_') ? 'token' : 'Bearer';
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github.v3+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+
+    if (opts.token) {
+      // Classic PATs (ghp_) require "token" scheme; fine-grained PATs (github_pat_),
+      // GitHub App installation tokens, and OAuth tokens use "Bearer".
+      const authScheme = opts.token.startsWith('ghp_') ? 'token' : 'Bearer';
+      headers.Authorization = `${authScheme} ${opts.token}`;
+    }
 
     this.api = axios.create({
       baseURL: 'https://api.github.com',
       timeout: 30_000,
-      headers: {
-        Authorization: `${authScheme} ${opts.token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
+      headers,
     });
 
     attachAuthErrorInterceptor(this.api);
@@ -161,15 +182,6 @@ export class GitHubClient {
   /** Create a client using environment config (GITHUB_TOKEN or GITHUB_PAT). */
   static fromConfig(owner: string, repo: string): GitHubClient {
     const token = config.githubToken || config.githubPat;
-    if (!token) {
-      throw new Error(
-        'No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT in your .env file.\n' +
-          'For public repos, a classic PAT with zero scopes is sufficient.\n' +
-          'For private repos, the PAT needs the "repo" scope (classic) or ' +
-          '"Contents: Read" + "Pull requests: Read/Write" (fine-grained).\n' +
-          'Create one at: https://github.com/settings/tokens',
-      );
-    }
     return new GitHubClient({ token, owner, repo });
   }
 
@@ -177,15 +189,6 @@ export class GitHubClient {
   static fromPRUrl(url: string, token?: string): { client: GitHubClient; prNumber: number } {
     const { owner, repo, prNumber } = parsePRUrl(url);
     const tok = token || config.githubToken || config.githubPat;
-    if (!tok) {
-      throw new Error(
-        'No GitHub token found. Set GITHUB_TOKEN or GITHUB_PAT in your .env file.\n' +
-          'For public repos, a classic PAT with zero scopes is sufficient.\n' +
-          'For private repos, the PAT needs the "repo" scope (classic) or ' +
-          '"Contents: Read" + "Pull requests: Read/Write" (fine-grained).\n' +
-          'Create one at: https://github.com/settings/tokens',
-      );
-    }
     return { client: new GitHubClient({ token: tok, owner, repo }), prNumber };
   }
 

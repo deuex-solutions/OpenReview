@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "review": "node cli/dist/main.mjs review"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

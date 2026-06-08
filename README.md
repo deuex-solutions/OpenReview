@@ -47,30 +47,23 @@ jobs:
 
 ### CLI (review any PR from your terminal)
 
+For users who want to evaluate OpenReview without cloning:
+
 ```bash
 # Review a PR (Fast mode)
 npx openreview review --url https://github.com/owner/repo/pull/123
+```
 
-# Review a PR (Deep/RLM mode — agentic loop with sandbox)
-npx openreview review --url https://github.com/owner/repo/pull/123 --mode rlm
+For developers working in a local clone:
 
-# Expert mode (SOLID + security + quality deep review)
-npx openreview review --url https://github.com/owner/repo/pull/123 --expert
+```bash
+# 1. Build the project
+pnpm build
 
-# Output as JSON (for CI/CD integration)
-npx openreview review --url <PR-URL> --output json --quiet
-
-# Post findings directly as GitHub PR comments
-npx openreview review --url <PR-URL> --submit
-
-# Ask questions about a PR interactively
-npx openreview ask --url https://github.com/owner/repo/pull/123
-
-# View review trace logs
-npx openreview traces --list
-
-# Start the API server
-npx openreview serve --port 3000
+# 2. Run a review
+node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123
+# OR
+pnpm review --url https://github.com/owner/repo/pull/123
 ```
 
 ### GitHub Comment Commands
@@ -157,7 +150,7 @@ Key settings:
 | `INCLUDE_GLOBS`       | —             | File patterns to include (e.g. `src/**/*.ts`) |
 | `EXCLUDE_GLOBS`       | —             | File patterns to exclude (e.g. `dist/**`)    |
 | `OPENAI_BASE_URL`     | —             | Custom OpenAI-compatible endpoint URL        |
-| `GITHUB_PAT`          | —             | GitHub Personal Access Token (CLI mode)      |
+| `GITHUB_PAT`          | —             | GitHub Personal Access Token (Optional for public repos) |
 
 See [`.env.example`](.env.example) for the full list with all linter toggles and review behavior settings.
 
