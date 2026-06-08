@@ -93,4 +93,4 @@ export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {
 /*  Impact Analysis Types (Re-exports)                                 */
 /* ------------------------------------------------------------------ */
 
-export * from '../impact/types';
+export * from '../impact/types.js';

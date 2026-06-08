@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { extractImports, extractExports } from '../../../core/src/impact/tree-sitter';
 
 describe('Tree-sitter Parsing', () => {

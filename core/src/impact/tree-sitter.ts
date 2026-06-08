@@ -1,8 +1,9 @@
+import path from 'path';
+
 import Parser from 'tree-sitter';
-import TypeScript from 'tree-sitter-typescript';
 import JavaScript from 'tree-sitter-javascript';
 import Python from 'tree-sitter-python';
-import path from 'path';
+import TypeScript from 'tree-sitter-typescript';
 
 /**
  * Information about a detected import.
@@ -23,7 +24,7 @@ export interface ExportInfo {
 /**
  * Maps file extensions to Tree-sitter languages.
  */
-const LANGUAGE_MAP: Record<string, any> = {
+const LANGUAGE_MAP: Record<string, unknown> = {
   '.ts': TypeScript.typescript,
   '.tsx': TypeScript.tsx,
   '.js': JavaScript,
@@ -36,7 +37,7 @@ const LANGUAGE_MAP: Record<string, any> = {
 /**
  * Detects the Tree-sitter language based on file extension.
  */
-export function detectLanguage(filePath: string): any | undefined {
+export function detectLanguage(filePath: string): unknown | undefined {
   const ext = path.extname(filePath).toLowerCase();
   return LANGUAGE_MAP[ext];
 }
@@ -67,7 +68,7 @@ export function extractImports(filePath: string, content: string): ImportInfo[] 
 /**
  * Extracts exports from a source file using Tree-sitter.
  */
-export function extractExports(filePath: string, content: string): ExportInfo[] {
+export function extractExports(filePath: string, content: string): ExportInfo {
   const lang = detectLanguage(filePath);
   if (!lang) return { symbols: [] };
 
@@ -153,19 +154,19 @@ function extractJSExports(node: Parser.SyntaxNode, symbols: string[]) {
     if (child.type === 'export_statement') {
       for (const grandChild of child.children) {
         if (['function_declaration', 'class_declaration'].includes(grandChild.type)) {
-          const id = grandChild.children.find(n => n.type === 'identifier' || n.type === 'type_identifier');
+          const id = grandChild.children.find((n: Parser.SyntaxNode) => n.type === 'identifier' || n.type === 'type_identifier');
           if (id) symbols.push(id.text);
         } else if (['variable_declaration', 'lexical_declaration'].includes(grandChild.type)) {
           for (const declarator of grandChild.children) {
             if (declarator.type === 'variable_declarator') {
-              const id = declarator.children.find(n => n.type === 'identifier' || n.type === 'type_identifier');
+              const id = declarator.children.find((n: Parser.SyntaxNode) => n.type === 'identifier' || n.type === 'type_identifier');
               if (id) symbols.push(id.text);
             }
           }
         } else if (grandChild.type === 'export_clause') {
           for (const specifier of grandChild.children) {
             if (specifier.type === 'export_specifier') {
-              const id = specifier.children.find(n => n.type === 'identifier' || n.type === 'type_identifier');
+              const id = specifier.children.find((n: Parser.SyntaxNode) => n.type === 'identifier' || n.type === 'type_identifier');
               if (id) symbols.push(id.text);
             }
           }
@@ -180,7 +181,7 @@ function extractPythonImports(node: Parser.SyntaxNode, results: ImportInfo[]) {
 
   for (const child of node.children) {
     if (child.type === 'import_from_statement') {
-      const moduleNode = child.children.find(n => n.type === 'dotted_name');
+      const moduleNode = child.children.find((n: Parser.SyntaxNode) => n.type === 'dotted_name');
       if (moduleNode) {
         const source = moduleNode.text;
         if (!importMap.has(source)) importMap.set(source, new Set());
@@ -192,7 +193,7 @@ function extractPythonImports(node: Parser.SyntaxNode, results: ImportInfo[]) {
           if (afterImport && (grandChild.type === 'dotted_name' || grandChild.type === 'identifier')) {
             importMap.get(source)!.add(grandChild.text);
           } else if (afterImport && grandChild.type === 'aliased_import') {
-             const id = grandChild.children.find(n => n.type === 'identifier' || n.type === 'dotted_name');
+             const id = grandChild.children.find((n: Parser.SyntaxNode) => n.type === 'identifier' || n.type === 'dotted_name');
              if (id) importMap.get(source)!.add(id.text);
           }
         }
@@ -203,7 +204,7 @@ function extractPythonImports(node: Parser.SyntaxNode, results: ImportInfo[]) {
           const source = grandChild.text;
           if (!importMap.has(source)) importMap.set(source, new Set());
         } else if (grandChild.type === 'aliased_import') {
-          const moduleNode = grandChild.children.find(n => n.type === 'dotted_name');
+          const moduleNode = grandChild.children.find((n: Parser.SyntaxNode) => n.type === 'dotted_name');
           if (moduleNode) {
             const source = moduleNode.text;
             if (!importMap.has(source)) importMap.set(source, new Set());
@@ -225,12 +226,12 @@ function extractPythonImports(node: Parser.SyntaxNode, results: ImportInfo[]) {
 function extractPythonExports(node: Parser.SyntaxNode, symbols: string[]) {
   for (const child of node.children) {
     if (child.type === 'function_definition' || child.type === 'class_definition') {
-      const id = child.children.find(n => n.type === 'identifier');
+      const id = child.children.find((n: Parser.SyntaxNode) => n.type === 'identifier');
       if (id) symbols.push(id.text);
     } else if (child.type === 'expression_statement') {
-      const assignment = child.children.find(n => n.type === 'assignment');
+      const assignment = child.children.find((n: Parser.SyntaxNode) => n.type === 'assignment');
       if (assignment) {
-        const left = assignment.children.find(n => n.type === 'identifier');
+        const left = assignment.children.find((n: Parser.SyntaxNode) => n.type === 'identifier');
         if (left) symbols.push(left.text);
       }
     }
