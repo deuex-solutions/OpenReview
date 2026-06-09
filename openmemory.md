@@ -95,6 +95,16 @@ OpenReview is an open-source, agentic code review tool — AI-powered bug detect
 | ----------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `deno-runner.ts`  | `executeSandboxed()`, `verifyDenoInstallation()`, `SandboxResult` | Deno 2.7+ sandboxed code execution with explicit permission flags (`--allow-read`, `--deny-net`, `--deny-write`, `--deny-env`, `--deny-run`), 30s hard timeout via AbortController, GLOBALS injection, env variable stripping to prevent secret leakage |
 
+### core/src/impact/ — Impact Analysis MVP ✅
+
+| File              | Exports                                              | Purpose                                                                                                                                                                     |
+| ----------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `types.ts`        | `ImpactNode`, `ImpactGraph`, `ImpactResult`          | Impact-specific types, proximity/relevance scoring definitions                                                                                                              |
+| `tree-sitter.ts`  | `buildGraph()`                                       | Tree-sitter based language-agnostic import/dependency graph builder                                                                                                         |
+| `graph.ts`        | `traverseDependents()`                               | Dependency graph traversal with transitive tracing and proximity scoring (direct > 2nd degree > 3rd degree)                                                                 |
+| `analyzer.ts`     | `analyzeImpact()`                                    | Main entry point: takes changed files, builds graph, scores impact, and returns results                                                                                     |
+| `component-mapper.ts`| `isPageOrRoute()`, `mapComponentsToPages()`       | Component-to-page/route mapping based on path heuristics                                                                                                                    |
+
 ### core/src/server/ — Express API Server 🔲
 
 Placeholder. Will contain Express 5 internal API for future web UI.
@@ -242,7 +252,8 @@ tests/core/
 | 1     | 1    | ✅ Complete | Monorepo scaffold, config system, GitHub client, diff parser, comment poster, LLM router |
 | 1     | 2    | ✅ Complete | Review types, fast review engine, linter orchestration, formatters, SETUP.md             |
 | 1     | 3    | ✅ Complete | Deno sandbox, hybrid snapshot, RLM loop, trace logger, chat handler, learnings store, 320 tests, comprehensive QA |
-| 1     | 4    | 🔲 Backlog  | CLI commands, GitHub Action handlers, SKILL.md, README, final testing & launch           |
+| 1     | 4    | ✅ Complete | CLI commands, GitHub Action handlers, SKILL.md, README, final testing & launch           |
+| 1     | 5-6  | ✅ Complete | Impact Analysis MVP: Tree-sitter graph, proximity scoring, terminal/json/markdown formatting, E2E evals |
 
 Planning docs: `progress-docs/` (PRD, Milestones, TodoList, Feature Spec)
 Weekly breakdowns: `local-docs/phase1-week{1-4}-todo.md`

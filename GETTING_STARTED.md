@@ -247,6 +247,8 @@ GITHUB_PAT=ghp_your-token-here
 | `EXCLUDE_GLOBS` | — | File patterns to exclude (e.g., `dist/**`) |
 | `OPENAI_BASE_URL` | — | Custom OpenAI-compatible endpoint |
 | `DEFAULT_REVIEW_MODE` | `fast` | Default: `fast` or `rlm` |
+| `IMPACT_ENABLED` | `true` | Enable dependency impact analysis |
+| `IMPACT_DEPTH_THRESHOLD` | `10` | Max depth for transitive dependency tracing |
 
 See [`.env.example`](.env.example) for the complete list with linter toggles and all options.
 
@@ -301,6 +303,9 @@ node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123 --out
 
 # Post findings directly as GitHub PR comments
 node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123 --submit
+
+# Run with dependency impact analysis explicitly disabled
+node cli/dist/main.mjs review --url https://github.com/owner/repo/pull/123 --no-impact
 ```
 
 ### Step 6: Explore other commands
@@ -334,6 +339,7 @@ PR Diff → File Filtering → Diff Chunking → LLM Review (per chunk) → Cita
 - Large diffs are chunked by file (~40K chars per LLM call) for reliable results
 - Lock files, generated code, and binaries are skipped automatically
 - Built-in linters (ESLint, Ruff, Semgrep, ShellCheck, Gitleaks) run in parallel
+- **Impact Analysis** computes the blast radius of changes across the codebase to prioritize findings that break critical dependents
 
 ### Deep / RLM Mode
 

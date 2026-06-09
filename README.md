@@ -15,6 +15,7 @@ Open-source, agentic code review tool. AI-powered bug detection, sandboxed code 
 - **Codebase-aware chat** — ask questions about your PR with full repo context via `@openreview`.
 - **Learns from feedback** — persistent learnings database avoids repeating false positives.
 - **Language & framework aware** — detects TypeScript, Python, Go, Rust, React, Next.js, and more for targeted review.
+- **Impact Analysis** — computes the blast radius of changes, scoring transitive dependents to prioritize high-impact findings.
 
 ## Quick Start
 
@@ -100,6 +101,7 @@ npx openreview review --url <PR-URL> [options]
 | `--expert`       | off      | Comprehensive SOLID, security, and quality review  |
 | `--submit`       | off      | Post findings as GitHub PR comment (inline + summary) |
 | `--quiet`        | off      | Suppress progress output (only print findings)     |
+| `--impact`       | auto     | Enable or disable (`--no-impact`) dependency impact analysis |
 
 **Expert mode** (`--expert`) adds deep analysis covering:
 - SOLID principles (single responsibility, open/closed, Liskov, interface segregation, dependency inversion)
@@ -242,8 +244,8 @@ See [GETTING_STARTED.md](GETTING_STARTED.md) for the full setup guide, [CONTRIBU
 
 ## Roadmap
 
-- **Phase 1 (MVP)** ✅ — CLI + GitHub Action, Fast + RLM review, codebase chat, learnings, trace logging
-- **Phase 2 (Growth)** — Web UI, auto-fix, Jira/Linear integration, 30+ linters, Docker sandbox, Impact Analysis
+- **Phase 1 (MVP)** ✅ — CLI + GitHub Action, Fast + RLM review, codebase chat, learnings, trace logging, Impact Analysis
+- **Phase 2 (Growth)** — Web UI, auto-fix, Jira/Linear integration, 30+ linters, Docker sandbox
 - **Phase 3 (Enterprise)** — Multi-platform (GitLab, Azure DevOps, Bitbucket), IDE extension, cloud hosting, analytics
 
 ## Contributing
