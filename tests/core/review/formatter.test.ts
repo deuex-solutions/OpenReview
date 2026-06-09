@@ -122,6 +122,15 @@ describe('formatInlineComment', () => {
     expect(result).toBeDefined();
     expect(result.length).toBeGreaterThan(0); // Badge should still be there
   });
+
+  it('includes impact scope annotation if present', () => {
+    const result = formatInlineComment(
+      makeFinding({
+        impactScope: { affectedFiles: 12, affectedPages: 3 },
+      }),
+    );
+    expect(result).toContain('⚡ **High impact** — affects 12 files across 3 pages');
+  });
 });
 
 /* ------------------------------------------------------------------ */
@@ -235,4 +244,27 @@ describe('formatSummaryComment', () => {
     expect(nonSevereIdx).toBeLessThan(investigateIdx);
     expect(investigateIdx).toBeLessThan(infoIdx);
   });
+
+  it('includes impact analysis section if impactSummary is provided', () => {
+    const result = formatSummaryComment(
+      makeSummary({
+        totalFindings: 1,
+        findingsBySeverity: { severe: 1, 'non-severe': 0, investigate: 0, informational: 0 },
+        impactSummary: {
+          totalImpacted: 10,
+          directDependents: 4,
+          transitiveDependents: 6,
+          affectedPageCount: 2,
+          affectedPages: ['/app/home', '/app/dashboard']
+        }
+      }),
+    );
+    expect(result).toContain('## 🌳 Impact Analysis');
+    expect(result).toContain('**Total impacted files:** 10');
+    expect(result).toContain('**Direct dependents:** 4');
+    expect(result).toContain('**Transitive dependents:** 6');
+    expect(result).toContain('**Affected UI Pages/Routes (2):**');
+    expect(result).toContain('🌐 `/app/home`');
+  });
 });
+

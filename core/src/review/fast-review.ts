@@ -14,6 +14,9 @@ import type {
   ReviewTrace,
 } from './types.js';
 import { sortFindings } from './types.js';
+import { analyzeImpact } from '../impact/analyzer.js';
+import { isPageOrRoute } from '../impact/component-mapper.js';
+import type { ImpactResult } from './types.js';
 
 /* ------------------------------------------------------------------ */
 /*  Zod schema for structured LLM output                               */
@@ -221,7 +224,12 @@ function chunkDiff(rawDiff: string, files: string[]): DiffChunk[] {
 export async function runFastReview(
   pr: PRContext,
   repoPath?: string,
-): Promise<{ findings: ReviewFinding[]; summary: ReviewSummary; trace: ReviewTrace }> {
+): Promise<{
+  findings: ReviewFinding[];
+  summary: ReviewSummary;
+  trace: ReviewTrace;
+  impact?: ImpactResult;
+}> {
   const start = Date.now();
   const trace: ReviewTrace = {
     model: config.mainModel,
@@ -271,7 +279,48 @@ export async function runFastReview(
   // 6. Merge and deduplicate
   const merged = deduplicateFindings(validated, linterFindings);
 
-  // 7. Sort by severity
+  // 6.5 Impact Analysis
+  let impactSummaryData: { totalImpacted: number; affectedPageCount: number } | undefined;
+  let impactResultData: ImpactResult | undefined;
+
+  if (repoPath && config.impactEnabled) {
+    const { glob } = await import('tinyglobby');
+    const allFiles = await glob(['**/*'], {
+      cwd: repoPath,
+      ignore: ['node_modules/**', '.git/**', 'dist/**'],
+      absolute: false,
+    });
+    
+    const impactResult = await analyzeImpact(pr.files, allFiles, repoPath, {
+      enabled: config.impactEnabled,
+      depthThreshold: config.impactDepthThreshold,
+    });
+    impactResultData = impactResult;
+
+    impactSummaryData = {
+      totalImpacted: impactResult.summary.totalImpacted,
+      directDependents: impactResult.summary.directDependents,
+      transitiveDependents: impactResult.summary.transitiveDependents,
+      affectedPageCount: impactResult.summary.affectedPageCount,
+      affectedPages: impactResult.affectedPages,
+    };
+
+    // Enrich findings
+    for (const finding of merged) {
+      const downstreamFiles = impactResult.impactedFiles.filter(
+        (n) => n.importChain[0] === finding.file,
+      );
+      if (downstreamFiles.length > 0) {
+        const pages = downstreamFiles.filter((n) => isPageOrRoute(n.file)).length;
+        finding.impactScope = {
+          affectedFiles: downstreamFiles.length,
+          affectedPages: pages,
+        };
+      }
+    }
+  }
+
+  // 7. Sort by severity and impact
   const sorted = sortFindings(merged);
 
   const duration = Date.now() - start;
@@ -286,9 +335,9 @@ export async function runFastReview(
     }
   }
 
-  const summary = buildSummary(sorted, pr.files.length, duration);
+  const summary = buildSummary(sorted, pr.files.length, duration, impactSummaryData);
 
-  return { findings: sorted, summary, trace };
+  return { findings: sorted, summary, trace, impact: impactResultData };
 }
 
 /**
@@ -1013,6 +1062,13 @@ function buildSummary(
   findings: ReviewFinding[],
   fileCount: number,
   durationMs: number,
+  impactSummaryData?: {
+    totalImpacted: number;
+    directDependents: number;
+    transitiveDependents: number;
+    affectedPageCount: number;
+    affectedPages?: string[];
+  },
 ): ReviewSummary {
   const bySeverity: Record<FindingSeverity, number> = {
     severe: 0,
@@ -1034,6 +1090,7 @@ function buildSummary(
     mode: 'fast',
     findingsBySeverity: bySeverity,
     totalFindings: findings.length,
+    impactSummary: impactSummaryData,
   };
 }
 

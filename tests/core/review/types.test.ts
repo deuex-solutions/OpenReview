@@ -122,4 +122,28 @@ describe('sortFindings', () => {
     expect(result.linterName).toBe('ESLint');
     expect(result.citations).toHaveLength(1);
   });
+
+  it('sorts by impact scope when severities are equal', () => {
+    const input = [
+      makeFinding('severe', 's-low-impact', { impactScope: { affectedFiles: 1, affectedPages: 0 } }),
+      makeFinding('severe', 's-high-pages', { impactScope: { affectedFiles: 5, affectedPages: 2 } }),
+      makeFinding('severe', 's-high-files', { impactScope: { affectedFiles: 10, affectedPages: 0 } }),
+      makeFinding('non-severe', 'n-high-impact', { impactScope: { affectedFiles: 10, affectedPages: 5 } }),
+    ];
+    
+    // Expected order:
+    // 1. severe, 2 pages (s-high-pages)
+    // 2. severe, 0 pages, 10 files (s-high-files)
+    // 3. severe, 0 pages, 1 file (s-low-impact)
+    // 4. non-severe, high impact (severity takes precedence) (n-high-impact)
+    
+    const sorted = sortFindings(input);
+    expect(sorted.map(f => f.id)).toEqual([
+      's-high-pages',
+      's-high-files',
+      's-low-impact',
+      'n-high-impact'
+    ]);
+  });
 });
+

@@ -87,6 +87,10 @@ export interface OpenReviewConfig {
 
   // OpenAI-compatible endpoint
   openaiBaseUrl: string;
+
+  // Impact Analysis
+  impactEnabled: boolean;
+  impactDepthThreshold: number;
 }
 
 export function loadConfig(): OpenReviewConfig {
@@ -128,6 +132,9 @@ export function loadConfig(): OpenReviewConfig {
     openreviewHome,
 
     openaiBaseUrl: envString('OPENAI_BASE_URL', ''),
+
+    impactEnabled: envBool('IMPACT_ENABLED', true),
+    impactDepthThreshold: envInt('IMPACT_DEPTH_THRESHOLD', 10),
   };
 }
 

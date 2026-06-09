@@ -16,6 +16,9 @@ export function formatText(findings: ReviewFinding[], summary: ReviewSummary): s
 
   lines.push(`OpenReview — ${summary.mode} mode | ${summary.filesReviewed} files | ${summary.duration}`);
   lines.push(`Findings: ${summary.totalFindings}`);
+  if (summary.impactSummary) {
+    lines.push(`Impact Summary: ${summary.impactSummary.totalImpacted} total files impacted, ${summary.impactSummary.affectedPageCount} UI pages/routes affected`);
+  }
   lines.push('');
 
   if (findings.length === 0) {
@@ -26,7 +29,8 @@ export function formatText(findings: ReviewFinding[], summary: ReviewSummary): s
   for (const f of findings) {
     const icon = SEVERITY_ICONS[f.severity] ?? '❓';
     const source = f.source === 'linter' ? ` [${f.linterName}]` : '';
-    lines.push(`${icon} ${f.severity.toUpperCase()} ${f.file}:${f.startLine} — ${f.title}${source}`);
+    const impact = f.impactScope ? ` [Impact: ${f.impactScope.affectedPages} pages, ${f.impactScope.affectedFiles} files]` : '';
+    lines.push(`${icon} ${f.severity.toUpperCase()} ${f.file}:${f.startLine} — ${f.title}${source}${impact}`);
     lines.push(`  ${f.explanation}`);
     if (f.suggestedFix) {
       lines.push(`  Fix: ${f.suggestedFix}`);
@@ -47,6 +51,9 @@ export function formatMarkdown(findings: ReviewFinding[], summary: ReviewSummary
   lines.push(`## OpenReview Summary`);
   lines.push('');
   lines.push(`**Files reviewed:** ${summary.filesReviewed} | **Duration:** ${summary.duration} | **Mode:** ${summary.mode}`);
+  if (summary.impactSummary) {
+    lines.push(`**Impact:** ${summary.impactSummary.totalImpacted} total files impacted, ${summary.impactSummary.affectedPageCount} UI pages/routes affected`);
+  }
   lines.push('');
   lines.push('| Severity | Count |');
   lines.push('|---|---|');
@@ -74,7 +81,8 @@ export function formatMarkdown(findings: ReviewFinding[], summary: ReviewSummary
     lines.push(`### ${icon} ${severity}`);
     lines.push('');
     for (const f of group) {
-      lines.push(`**${f.title}** — \`${f.file}:${f.startLine}\``);
+      const impact = f.impactScope ? ` _[Impact: ${f.impactScope.affectedPages} pages, ${f.impactScope.affectedFiles} files]_` : '';
+      lines.push(`**${f.title}** — \`${f.file}:${f.startLine}\`${impact}`);
       lines.push('');
       lines.push(f.explanation);
       if (f.suggestedFix) {

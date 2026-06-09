@@ -449,80 +449,79 @@
 ## 16. Impact Analysis — Phase 1 MVP
 
 ### 16.1 Impact Types (`core/src/impact/types.ts`)
-- [ ] Define `ImpactNode` interface: `file`, `importedSymbols`, `proximity`, `relevanceScore`, `importChain`
-- [ ] Define `ImpactResult` interface: `changedFiles`, `impactedFiles`, `affectedPages`, `affectedComponents`, `summary`
-- [ ] Define `ImpactGraph` interface for internal dependency graph representation
-- [ ] Define relevance scoring constants: direct (1.0), 2nd degree (0.7), 3rd degree (0.5), deeper (diminishing)
-- [ ] Export impact types from `core/src/review/types.ts` (canonical re-export)
+- [x] Define `ImpactNode` interface: `file`, `importedSymbols`, `proximity`, `relevanceScore`, `importChain`
+- [x] Define `ImpactResult` interface: `changedFiles`, `impactedFiles`, `affectedPages`, `affectedComponents`, `summary`
+- [x] Define `ImpactGraph` interface for internal dependency graph representation
+- [x] Define relevance scoring constants: direct (1.0), 2nd degree (0.7), 3rd degree (0.5), deeper (diminishing)
+- [x] Export impact types from `core/src/review/types.ts` (canonical re-export)
 
 ### 16.2 Tree-sitter Dependency Graph Builder (`core/src/impact/tree-sitter.ts`)
-- [ ] Install `tree-sitter` and language grammars (tree-sitter-typescript, tree-sitter-python, tree-sitter-javascript, etc.) in `core`
-- [ ] Implement `detectLanguage(filePath: string): string` — map file extension to Tree-sitter grammar
-- [ ] Implement `extractImports(filePath: string, content: string): ImportInfo[]` — parse file AST, extract import/require/use statements
-- [ ] Implement `extractExports(filePath: string, content: string): ExportInfo[]` — parse file AST, extract exported symbols
-- [ ] Support language-agnostic parsing: JS/TS (`import`/`require`/`export`), Python (`import`/`from`), Go (`import`), Java (`import`), Ruby (`require`/`require_relative`), Rust (`use`/`mod`)
-- [ ] Handle dynamic imports and re-exports
-- [ ] Guard against malformed input — validate AST nodes before accessing properties
-- [ ] Unit test: import extraction per language, export extraction, dynamic imports, malformed input
+- [x] Install `tree-sitter` and language grammars (tree-sitter-typescript, tree-sitter-python, tree-sitter-javascript, etc.) in `core`
+- [x] Implement `detectLanguage(filePath: string): string` — map file extension to Tree-sitter grammar
+- [x] Implement `extractImports(filePath: string, content: string): ImportInfo[]` — parse file AST, extract import/require/use statements
+- [x] Implement `extractExports(filePath: string, content: string): ExportInfo[]` — parse file AST, extract exported symbols
+- [x] Support language-agnostic parsing: JS/TS (`import`/`require`/`export`), Python (`import`/`from`), Go (`import`), Java (`import`), Ruby (`require`/`require_relative`), Rust (`use`/`mod`)
+- [x] Handle dynamic imports and re-exports
+- [x] Guard against malformed input — validate AST nodes before accessing properties
+- [x] Unit test: import extraction per language, export extraction, dynamic imports, malformed input
 
 ### 16.3 Dependency Graph & Traversal (`core/src/impact/graph.ts`)
-- [ ] Implement `buildDependencyGraph(files: string[], repoPath: string): ImpactGraph` — build full repo import graph using Tree-sitter
-- [ ] Implement `traceImpact(changedFiles: string[], graph: ImpactGraph): ImpactNode[]` — BFS/DFS transitive traversal from changed files
-- [ ] Implement relevance scoring: score = f(proximity), direct = 1.0, each degree reduces score
-- [ ] Implement configurable depth threshold (`IMPACT_DEPTH_THRESHOLD`) to cap traversal depth
-- [ ] Deduplicate: if a file is reachable via multiple paths, keep highest relevance score
-- [ ] Sort results: highest relevance first
-- [ ] Unit test: graph building, transitive traversal, scoring, deduplication, depth threshold
+- [x] Implement `buildDependencyGraph(files: string[], repoPath: string): ImpactGraph` — build full repo import graph using Tree-sitter
+- [x] Implement `traceImpact(changedFiles: string[], graph: ImpactGraph): ImpactNode[]` — BFS/DFS transitive traversal from changed files
+- [x] Implement relevance scoring: score = f(proximity), direct = 1.0, each degree reduces score
+- [x] Implement configurable depth threshold (`IMPACT_DEPTH_THRESHOLD`) to cap traversal depth
+- [x] Deduplicate: if a file is reachable via multiple paths, keep highest relevance score
+- [x] Sort results: highest relevance first
+- [x] Unit test: graph building, transitive traversal, scoring, deduplication, depth threshold
 
 ### 16.4 Component-to-Page Mapper (`core/src/impact/component-mapper.ts`)
-- [ ] Implement `mapToPages(impactedFiles: ImpactNode[], repoPath: string): PageMapping[]` — identify which UI pages/routes are affected
-- [ ] Detect page/route files by convention: files in `pages/`, `routes/`, `views/`, `screens/` directories or files matching common routing patterns
-- [ ] Detect route definitions: React Router, Next.js pages/app dir, Vue Router, Angular routing modules
-- [ ] For each impacted file, trace upward to the page/route that renders it
-- [ ] Return mapping: `{ component: string, pages: string[], routes: string[] }`
-- [ ] Unit test: page detection, route detection, component-to-page mapping
+- [x] Implement `mapToPages(impactedFiles: ImpactNode[], repoPath: string): PageMapping[]` — identify which UI pages/routes are affected
+- [x] Detect page/route files by convention: files in `pages/`, `routes/`, `views/`, `screens/` directories or files matching common routing patterns
+- [x] Detect route definitions: React Router, Next.js pages/app dir, Vue Router, Angular routing modules
+- [x] For each impacted file, trace upward to the page/route that renders it
+- [x] Return mapping: `{ component: string, pages: string[], routes: string[] }`
+- [x] Unit test: page detection, route detection, component-to-page mapping
 
 ### 16.5 Impact Analyzer Entry Point (`core/src/impact/analyzer.ts`)
-- [ ] Implement `analyzeImpact(changedFiles: string[], repoPath: string, config: ImpactConfig): Promise<ImpactResult>`
-- [ ] Orchestrate: build graph → trace impact → score → map components → build result
-- [ ] Accept both git diff files and manual `--files` input
-- [ ] Respect `IMPACT_ENABLED` and `IMPACT_DEPTH_THRESHOLD` config
-- [ ] Performance target: < 30 seconds for repos with ≤ 500 files
-- [ ] Unit test: end-to-end flow with mock repo, config handling, performance
+- [x] Implement `analyzeImpact(changedFiles: string[], repoPath: string, config: ImpactConfig): Promise<ImpactResult>`
+- [x] Orchestrate: build graph → trace impact → score → map components → build result
+- [x] Accept both git diff files and manual `--files` input
+- [x] Respect `IMPACT_ENABLED` and `IMPACT_DEPTH_THRESHOLD` config
+- [x] Performance target: < 30 seconds for repos with ≤ 500 files
+- [x] Unit test: end-to-end flow with mock repo, config handling, performance
 
 ### 16.6 Review Pipeline Integration
-- [ ] Add `IMPACT_ENABLED` (boolean, default: true) and `IMPACT_DEPTH_THRESHOLD` (number, default: 10) to `core/src/config/env.ts`
-- [ ] In `core/src/review/fast-review.ts`: call `analyzeImpact()` after deduplication, before sorting
-- [ ] Enrich each `ReviewFinding` with optional `impactScope?: { affectedFiles: number, affectedPages: number }` field
-- [ ] Re-sort findings: impact-weighted prioritization (high-impact files surface first)
-- [ ] Add impact summary to `ReviewSummary` type
-- [ ] Unit test: integration with review pipeline, finding enrichment, prioritization
+- [x] Add `IMPACT_ENABLED` (boolean, default: true) and `IMPACT_DEPTH_THRESHOLD` (number, default: 10) to `core/src/config/env.ts`
+- [x] In `core/src/review/fast-review.ts`: call `analyzeImpact()` after deduplication, before sorting
+- [x] Enrich each `ReviewFinding` with optional `impactScope?: { affectedFiles: number, affectedPages: number }` field
+- [x] Re-sort findings: impact-weighted prioritization (high-impact files surface first)
+- [x] Add impact summary to `ReviewSummary` type
+- [x] Unit test: integration with review pipeline, finding enrichment, prioritization
 
 ### 16.7 CLI Integration
-- [ ] In `cli/src/commands/review.ts`: add `--impact` and `--no-impact` flags
-- [ ] Add interactive prompt: "Would you like to include impact analysis? (y/n)" (shown when neither flag is set)
-- [ ] Add `--files <paths>` flag for manual file targeting (comma-separated)
-- [ ] When `--impact` or user says "y": call impact analysis as part of review
-- [ ] When `--no-impact` or user says "n": skip impact analysis
+- [x] In `cli/src/commands/review.ts`: add `--impact` and `--no-impact` flags
+- [x] Add interactive prompt: "Would you like to include impact analysis? (y/n)" (shown when neither flag is set)
+- [x] When `--impact` or user says "y": call impact analysis as part of review
+- [x] When `--no-impact` or user says "n": skip impact analysis
 
 ### 16.8 Terminal Output
-- [ ] Implement `formatImpactTree(result: ImpactResult): string` — structured tree view of impacted files
-- [ ] Show proximity scores, import chain paths, and affected page/route annotations
-- [ ] Group by proximity level: Direct Dependents → 2nd Degree → 3rd Degree → Deeper
-- [ ] Highlight component-to-page mapping section
-- [ ] Unit test: formatting output for various impact scenarios
+- [x] Implement `formatImpactTree(result: ImpactResult): string` — structured tree view of impacted files
+- [x] Show proximity scores, import chain paths, and affected page/route annotations
+- [x] Group by proximity level: Direct Dependents → 2nd Degree → 3rd Degree → Deeper
+- [x] Highlight component-to-page mapping section
+- [x] Unit test: formatting output for various impact scenarios
 
 ### 16.9 JSON Report Output
-- [ ] Implement `writeImpactReport(result: ImpactResult, outputPath: string): void`
-- [ ] Write machine-readable JSON file (`impact-report.json`) alongside review output
-- [ ] Include all impact data: changed files, impacted files with scores, affected pages, summary stats
-- [ ] Unit test: JSON structure, file writing
+- [x] Implement `writeImpactReport(result: ImpactResult, outputPath: string): void`
+- [x] Write machine-readable JSON file (`impact-report.json`) alongside review output
+- [x] Include all impact data: changed files, impacted files with scores, affected pages, summary stats
+- [x] Unit test: JSON structure, file writing
 
 ### 16.10 Review Output Integration
-- [ ] Add standalone "Impact Analysis" section to review summary (terminal and summary comment)
-- [ ] Format: total impacted files, direct vs transitive count, affected pages list
-- [ ] Annotate individual findings with impact scope (e.g., "⚡ High impact — affects 12 files across 3 pages")
-- [ ] Unit test: summary section format, finding annotation format
+- [x] Add standalone "Impact Analysis" section to review summary (terminal and summary comment)
+- [x] Format: total impacted files, direct vs transitive count, affected pages list
+- [x] Annotate individual findings with impact scope (e.g., "⚡ High impact — affects 12 files across 3 pages")
+- [x] Unit test: summary section format, finding annotation format
 
 ---
 

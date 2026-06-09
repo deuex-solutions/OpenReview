@@ -107,28 +107,33 @@ Ship a working, self-hosted OpenReview that a developer can install in 5 minutes
 **Goal:** When a developer runs `openreview review`, optionally identify all files and UI components affected by the changes in the PR — providing a full blast-radius view alongside the existing review findings.
 
 - `core/src/impact/` — New module for impact analysis engine
-  - `core/src/impact/types.ts` — Impact-specific types: `ImpactNode`, `ImpactGraph`, `ImpactResult`, proximity/relevance scoring types
-  - `core/src/impact/tree-sitter.ts` — Tree-sitter based import/dependency graph builder (language-agnostic, supports JS/TS, Python, Go, Java, Ruby, Rust, etc.)
-  - `core/src/impact/graph.ts` — Dependency graph traversal with transitive tracing and relevance scoring (direct > 2nd degree > 3rd degree)
-  - `core/src/impact/analyzer.ts` — Main entry point: takes changed files (git diff + staged), builds graph, returns scored impact results
-  - `core/src/impact/component-mapper.ts` — Textual component-to-page/route mapping (which UI pages/routes are affected by changed files)
-- Integration into review pipeline
+  - ✅ `core/src/impact/types.ts` — Impact-specific types: `ImpactNode`, `ImpactGraph`, `ImpactResult`, proximity/relevance scoring types
+  - ✅ `core/src/impact/tree-sitter.ts` — Tree-sitter based import/dependency graph builder (language-agnostic, supports JS/TS, Python, Go, Java, Ruby, Rust, etc.)
+  - ✅ `core/src/impact/graph.ts` — Dependency graph traversal with transitive tracing and relevance scoring (direct > 2nd degree > 3rd degree)
+  - ✅ `core/src/impact/analyzer.ts` — Main entry point: takes changed files (git diff + staged), builds graph, returns scored impact results
+  - ✅ `core/src/impact/component-mapper.ts` — Textual component-to-page/route mapping (which UI pages/routes are affected by changed files)
+- ✅ Integration into review pipeline
   - Interactive prompt during `openreview review`: "Would you like to include impact analysis? (y/n)"
   - `--impact` / `--no-impact` CLI flags to skip the prompt (for CI/automation)
+  - ✅ Enrichment of `ReviewFinding` objects with impact metadata (affected downstream routes)
   - `--files <paths>` override flag for manual file targeting (ad-hoc exploration)
   - Default input: git diff + staged changes; `--files` overrides with arbitrary file list
-- Output — Terminal
-  - Structured tree of impacted files with proximity scores and import chain paths
-  - Component-to-page mapping section (which UI pages/routes are affected)
-- Output — JSON report
-  - Machine-readable JSON report file for CI/CD integration
-- Review integration
-  - Standalone "Impact Analysis" summary section in review output
-  - Each `ReviewFinding` enriched with impact scope annotation (e.g., "This bug in `Button.tsx` affects 12 files across 3 pages")
+- ✅ Output — Terminal
+  - ✅ Structured tree of impacted files with proximity scores and import chain paths
+  - ✅ Integration with existing JSON/Markdown formatters
+  - ✅ Component-to-page mapping section (which UI pages/routes are affected)
+- ✅ Output — JSON report
+  - ✅ Machine-readable JSON report file for CI/CD integration
+- ✅ Review integration
+  - ✅ Standalone "Impact Analysis" summary section in review output
+  - ✅ Each `ReviewFinding` enriched with impact scope annotation (e.g., "This bug in `Button.tsx` affects 12 files across 3 pages")
   - Impact-based prioritization: findings in high-impact files surface first
 - Types integrated into `core/src/review/types.ts` (canonical source of truth)
 - Config: `IMPACT_ENABLED`, `IMPACT_DEPTH_THRESHOLD` env vars in `core/src/config/env.ts`
-- Unit tests for graph building, traversal, scoring, and component mapping
+- ✅ Unit tests for graph building, traversal, scoring, and component mapping
+- ✅ E2E Evaluation (`tests/evals/impact.eval.ts`)
+  - ✅ Accuracy checks: verification of deep transitive dependents
+  - ✅ Performance checks: enforcing sub-50ms thresholds
 
 ---
 

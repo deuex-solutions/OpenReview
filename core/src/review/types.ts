@@ -32,6 +32,7 @@ export interface ReviewFinding {
   source: FindingSource;
   linterName?: string;
   citations: Citation[];
+  impactScope?: { affectedFiles: number; affectedPages: number };
 }
 
 /** Aggregated summary of a review session. */
@@ -41,6 +42,13 @@ export interface ReviewSummary {
   mode: 'fast' | 'rlm';
   findingsBySeverity: Record<FindingSeverity, number>;
   totalFindings: number;
+  impactSummary?: {
+    totalImpacted: number;
+    directDependents: number;
+    transitiveDependents: number;
+    affectedPageCount: number;
+    affectedPages?: string[];
+  };
 }
 
 /** Diagnostic trace for observability into the review pipeline. */
@@ -84,9 +92,21 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   informational: 3,
 };
 
-/** Sort findings by severity (most critical first). */
+/** Sort findings by severity (most critical first), then by impact scope. */
 export function sortFindings(findings: ReviewFinding[]): ReviewFinding[] {
-  return [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  return [...findings].sort((a, b) => {
+    const sevDiff = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+    if (sevDiff !== 0) return sevDiff;
+    
+    // Impact weighting: higher affected pages first, then higher affected files
+    const aPages = a.impactScope?.affectedPages ?? 0;
+    const bPages = b.impactScope?.affectedPages ?? 0;
+    if (aPages !== bPages) return bPages - aPages;
+
+    const aFiles = a.impactScope?.affectedFiles ?? 0;
+    const bFiles = b.impactScope?.affectedFiles ?? 0;
+    return bFiles - aFiles;
+  });
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,3 +1,4 @@
+import { createInterface } from 'node:readline/promises';
 import {
   CommentPoster,
   GitHubClient,
@@ -24,6 +25,8 @@ export function registerReviewCommand(program: Command): void {
     .option('--expert', 'Comprehensive SOLID/security/quality review')
     .option('--submit', 'Post findings as GitHub PR comment')
     .option('--quiet', 'Suppress progress output')
+    .option('--impact', 'Include impact analysis')
+    .option('--no-impact', 'Skip impact analysis')
     .action(async (opts) => {
       try {
         const cfg = loadConfig();
@@ -31,6 +34,17 @@ export function registerReviewCommand(program: Command): void {
 
         if (opts.model) {
           (cfg as unknown as Record<string, unknown>).mainModel = opts.model;
+        }
+
+        if (opts.impact === true) {
+          cfg.impactEnabled = true;
+        } else if (opts.impact === false) {
+          cfg.impactEnabled = false;
+        } else if (!process.env.CI && process.stdout.isTTY) {
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          const answer = await rl.question('Would you like to include impact analysis? (y/n) ');
+          rl.close();
+          cfg.impactEnabled = answer.trim().toLowerCase() === 'y';
         }
 
         const { client, prNumber } = GitHubClient.fromPRUrl(opts.url);
@@ -73,6 +87,8 @@ export function registerReviewCommand(program: Command): void {
         let findings: ReviewFinding[];
         let summary: ReviewSummary;
 
+        let impactResult: any;
+
         if (opts.mode === 'rlm') {
           if (!opts.quiet) {
             process.stderr.write('Running RLM deep review...\n');
@@ -109,9 +125,10 @@ export function registerReviewCommand(program: Command): void {
             process.stderr.write('Running fast review...\n');
           }
 
-          const result = await runFastReview(prContext);
+          const result = await runFastReview(prContext, process.cwd());
           findings = result.findings;
           summary = result.summary;
+          impactResult = result.impact;
         }
 
         // Format and print output

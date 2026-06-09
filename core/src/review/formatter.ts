@@ -37,6 +37,21 @@ export function formatSummaryComment(summary: ReviewSummary): string {
     md += `\n**Total:** ${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}\n`;
   }
 
+  if (summary.impactSummary && summary.impactSummary.totalImpacted > 0) {
+    md += '\n## 🌳 Impact Analysis\n\n';
+    md += `- **Total impacted files:** ${summary.impactSummary.totalImpacted}\n`;
+    md += `- **Direct dependents:** ${summary.impactSummary.directDependents}\n`;
+    md += `- **Transitive dependents:** ${summary.impactSummary.transitiveDependents}\n`;
+    
+    if (summary.impactSummary.affectedPageCount > 0 && summary.impactSummary.affectedPages) {
+      md += `\n**Affected UI Pages/Routes (${summary.impactSummary.affectedPageCount}):**\n`;
+      for (const page of summary.impactSummary.affectedPages) {
+        md += `- 🌐 \`${page}\`\n`;
+      }
+    }
+    md += '\n';
+  }
+
   md += '\n---\n';
   md +=
     '*Trigger deep review: `@openreview rlm` | Ask a question: `@openreview <your question>`*\n';
@@ -50,7 +65,14 @@ export function formatSummaryComment(summary: ReviewSummary): string {
 
 export function formatInlineComment(finding: ReviewFinding): string {
   const badge = SEVERITY_BADGES[finding.severity];
-  let body = `${badge}: ${finding.title}\n\n${finding.explanation}`;
+  let body = `${badge}: ${finding.title}\n\n`;
+
+  if (finding.impactScope && finding.impactScope.affectedFiles > 0) {
+    const pagesText = finding.impactScope.affectedPages > 0 ? ` across ${finding.impactScope.affectedPages} pages` : '';
+    body += `⚡ **High impact** — affects ${finding.impactScope.affectedFiles} files${pagesText}\n\n`;
+  }
+
+  body += `${finding.explanation}`;
 
   if (finding.suggestedFix) {
     body += `\n\n**Suggested fix:**\n\`\`\`suggestion\n${finding.suggestedFix}\n\`\`\``;

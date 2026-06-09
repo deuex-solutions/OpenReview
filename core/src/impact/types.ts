@@ -56,3 +56,12 @@ export const IMPACT_SCORES = {
   THIRD_DEGREE: 0.5,
   DIMINISHING_FACTOR: 0.8, // multiply score by this for each additional level
 } as const;
+
+/**
+ * Configuration options for impact analysis.
+ */
+export interface ImpactConfig {
+  enabled: boolean;
+  depthThreshold: number;
+}
+
