@@ -23,3 +23,5 @@ Thumbs.db
 .cursor/rules/openmemory.mdc
 CLAUDE.md
 coverage/
+
+.pnpm-store/
