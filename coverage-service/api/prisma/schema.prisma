@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id           String       @id @default(cuid())
+  name         String
+  createdAt    DateTime     @default(now())
+  repositories Repository[]
+}
+
+model Repository {
+  id              String          @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  githubRepo      String
+  defaultBranch   String          @default("main")
+  coverageCommand String          @default("npm test -- --coverage")
+  testCommand     String          @default("npm test")
+  installCommand  String          @default("")
+  createdAt       DateTime        @default(now())
+  pullRequestRuns PullRequestRun[]
+
+  @@unique([workspaceId, githubRepo])
+}
+
+enum PrRunStatus {
+  PENDING
+  CLONING
+  RUNNING_COVERAGE
+  ANALYZING
+  GENERATING_TESTS
+  RUNNING_TESTS
+  RECALCULATING
+  COMPLETED
+  FAILED
+}
+
+enum ExecutionStatus {
+  PASS
+  FAIL
+  SKIPPED
+  PARTIAL
+}
+
+model PullRequestRun {
+  id           String                @id @default(cuid())
+  repositoryId String
+  repository   Repository            @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  prNumber     Int
+  headBranch   String?
+  headSha      String?
+  baseBranch   String?
+  status       PrRunStatus           @default(PENDING)
+  startedAt    DateTime              @default(now())
+  completedAt  DateTime?
+  coverageResult CoverageResult?
+  generatedTests GeneratedTestArtifact[]
+  executionLogs  ExecutionLog[]
+
+  @@index([repositoryId, prNumber])
+}
+
+model CoverageResult {
+  id                   String         @id @default(cuid())
+  prRunId              String         @unique
+  prRun                PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  beforeCoverage       Float?
+  afterCoverage        Float?
+  diffCoverageBefore   Float?
+  diffCoverageAfter    Float?
+  beforeFileCoverage   Json?
+  afterFileCoverage    Json?
+  generatedTestsCount  Int            @default(0)
+  filesImproved        String[]       @default([])
+  executionStatus      ExecutionStatus @default(SKIPPED)
+  workflowSummary      Json?
+  createdAt            DateTime       @default(now())
+}
+
+model GeneratedTestArtifact {
+  id         String         @id @default(cuid())
+  prRunId    String
+  prRun      PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  filePath   String
+  targetFile String
+  content    String         @db.Text
+  passed     Boolean?
+  createdAt  DateTime       @default(now())
+}
+
+model ExecutionLog {
+  id        String         @id @default(cuid())
+  prRunId   String
+  prRun     PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  level     String         @default("info")
+  message   String         @db.Text
+  createdAt DateTime       @default(now())
+}
