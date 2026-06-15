@@ -1,4 +1,4 @@
-import type { ReviewFinding, ReviewSummary } from '@openreview/core';
+import type { FindingSeverity, ReviewFinding, ReviewSummary } from '@openreview/core';
 
 /* ------------------------------------------------------------------ */
 /*  Text output                                                        */
@@ -61,8 +61,7 @@ export function formatMarkdown(findings: ReviewFinding[], summary: ReviewSummary
     return lines.join('\n');
   }
 
-  // Group by severity
-  const grouped = new Map<string, ReviewFinding[]>();
+  const grouped = new Map<FindingSeverity, ReviewFinding[]>();
   for (const f of findings) {
     const group = grouped.get(f.severity) ?? [];
     group.push(f);

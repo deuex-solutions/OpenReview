@@ -1,0 +1,30 @@
+{
+  "name": "@openreview/service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted webhook service that receives GitHub PR events and runs OpenReview reviews",
+  "scripts": {
+    "build": "tsdown src/web.ts src/worker.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start:web": "node dist/web.mjs",
+    "start:worker": "node dist/worker.mjs",
+    "dev:web": "node --watch --import tsx src/web.ts",
+    "dev:worker": "node --watch --import tsx src/worker.ts"
+  },
+  "dependencies": {
+    "@openreview/core": "workspace:*",
+    "bullmq": "^5.34.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "ioredis": "5.10.1",
+    "pino": "^9.5.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "pino-pretty": "^11.3.0",
+    "tsx": "^4.20.0"
+  }
+}

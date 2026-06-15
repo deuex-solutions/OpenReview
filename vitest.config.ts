@@ -5,11 +5,16 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     passWithNoTests: true,
-    include: ['tests/**/*.test.ts', 'cli/**/*.test.ts', 'action/**/*.test.ts'],
+    include: [
+      'tests/**/*.test.ts',
+      'cli/**/*.test.ts',
+      'action/**/*.test.ts',
+      'service/**/*.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      include: ['core/src/**', 'cli/src/**', 'action/src/**'],
+      include: ['core/src/**', 'cli/src/**', 'action/src/**', 'service/src/**'],
       exclude: ['**/node_modules/**', '**/dist/**'],
     },
   },
