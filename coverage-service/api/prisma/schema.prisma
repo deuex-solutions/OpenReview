@@ -7,26 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Workspace {
-  id           String       @id @default(cuid())
-  name         String
-  createdAt    DateTime     @default(now())
-  repositories Repository[]
-}
-
 model Repository {
   id              String          @id @default(cuid())
-  workspaceId     String
-  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  githubRepo      String
+  githubRepo      String          @unique
   defaultBranch   String          @default("main")
   coverageCommand String          @default("npm test -- --coverage")
   testCommand     String          @default("npm test")
   installCommand  String          @default("")
   createdAt       DateTime        @default(now())
   pullRequestRuns PullRequestRun[]
-
-  @@unique([workspaceId, githubRepo])
 }
 
 enum PrRunStatus {

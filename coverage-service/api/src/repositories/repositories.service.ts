@@ -6,11 +6,9 @@ import { CreateRepositoryDto } from './dto/create-repository.dto';
 export class RepositoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(workspaceId: string, dto: CreateRepositoryDto) {
-    await this.ensureWorkspace(workspaceId);
+  create(dto: CreateRepositoryDto) {
     return this.prisma.repository.create({
       data: {
-        workspaceId,
         githubRepo: dto.githubRepo,
         defaultBranch: dto.defaultBranch ?? 'main',
         coverageCommand: dto.coverageCommand ?? 'npx nyc --reporter=cobertura --report-dir=coverage node --test',
@@ -20,9 +18,8 @@ export class RepositoriesService {
     });
   }
 
-  findByWorkspace(workspaceId: string) {
+  findAll() {
     return this.prisma.repository.findMany({
-      where: { workspaceId },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -46,12 +43,5 @@ export class RepositoriesService {
     return this.prisma.repository.findFirst({
       where: { githubRepo },
     });
-  }
-
-  private async ensureWorkspace(workspaceId: string) {
-    const ws = await this.prisma.workspace.findUnique({
-      where: { id: workspaceId },
-    });
-    if (!ws) throw new NotFoundException('Workspace not found');
   }
 }

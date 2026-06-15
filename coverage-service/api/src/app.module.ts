@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
-import { WorkspacesModule } from './workspaces/workspaces.module';
 import { RepositoriesModule } from './repositories/repositories.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { PrRunsModule } from './pr-runs/pr-runs.module';
@@ -14,7 +13,6 @@ import { HealthController } from './health/health.controller';
     PrismaModule,
     QueueModule,
     GitHubModule,
-    WorkspacesModule,
     RepositoriesModule,
     AnalysisModule,
     WebhooksModule,

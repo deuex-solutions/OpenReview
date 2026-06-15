@@ -17,7 +17,7 @@ PR diff coverage analysis and LLM unit test generation, integrated into the Open
 | Package | Role |
 |---------|------|
 | `@openreview/coverage-lib` | Shared types, coverage providers, LLM providers, code analysis |
-| `@openreview/coverage-api` | NestJS API — workspaces, repos, webhooks, job enqueue |
+| `@openreview/coverage-api` | NestJS API — repos, webhooks, job enqueue |
 | `@openreview/coverage-worker` | BullMQ worker — clone, coverage, test generation, execution |
 
 ## Quick Start
@@ -54,14 +54,10 @@ pnpm coverage:dev:api
 pnpm coverage:dev:worker
 ```
 
-### 4. Register a workspace and repository
+### 4. Register a repository
 
 ```bash
-curl -X POST http://localhost:3000/workspaces \
-  -H "Content-Type: application/json" \
-  -d '{"name": "My Team"}'
-
-curl -X POST http://localhost:3000/workspaces/<workspace-id>/repositories \
+curl -X POST http://localhost:3000/repositories \
   -H "Content-Type: application/json" \
   -d '{
     "githubRepo": "owner/repo",
@@ -83,11 +79,9 @@ curl -X POST http://localhost:3000/workspaces/<workspace-id>/repositories \
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
-| POST | `/workspaces` | Create workspace |
-| GET | `/workspaces` | List workspaces |
-| GET | `/workspaces/:id` | Get workspace with repos |
-| POST | `/workspaces/:id/repositories` | Register repository |
-| GET | `/workspaces/:id/repositories` | List repositories |
+| POST | `/repositories` | Register repository |
+| GET | `/repositories` | List repositories |
+| GET | `/repositories/:id` | Get repository with recent PR runs |
 | POST | `/repositories/:id/analyze` | Trigger analysis by PR # |
 | POST | `/webhooks/github` | GitHub webhook handler |
 | GET | `/pr-runs/:id` | Get PR run results |

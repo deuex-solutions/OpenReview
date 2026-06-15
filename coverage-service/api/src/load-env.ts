@@ -3,8 +3,9 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 
 const envPaths = [
-  resolve(__dirname, '../../../.env'),
+  // Prefer coverage-service/.env (README setup) over monorepo root .env
   resolve(__dirname, '../../.env'),
+  resolve(__dirname, '../../../.env'),
   resolve(process.cwd(), '../.env'),
   resolve(process.cwd(), '.env'),
 ];

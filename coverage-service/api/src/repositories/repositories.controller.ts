@@ -2,21 +2,18 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { RepositoriesService } from './repositories.service';
 import { CreateRepositoryDto } from './dto/create-repository.dto';
 
-@Controller('workspaces/:workspaceId/repositories')
+@Controller('repositories')
 export class RepositoriesController {
   constructor(private readonly repositoriesService: RepositoriesService) {}
 
   @Post()
-  create(
-    @Param('workspaceId') workspaceId: string,
-    @Body() dto: CreateRepositoryDto,
-  ) {
-    return this.repositoriesService.create(workspaceId, dto);
+  create(@Body() dto: CreateRepositoryDto) {
+    return this.repositoriesService.create(dto);
   }
 
   @Get()
-  findAll(@Param('workspaceId') workspaceId: string) {
-    return this.repositoriesService.findByWorkspace(workspaceId);
+  findAll() {
+    return this.repositoriesService.findAll();
   }
 
   @Get(':id')
