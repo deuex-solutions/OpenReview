@@ -1,19 +1,42 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Queue } from 'bullmq';
-import { PR_ANALYSIS_QUEUE, PrAnalysisJobData } from '@openreview/coverage-lib';
+import {
+  PR_ANALYSIS_QUEUE,
+  PrAnalysisJobData,
+  TEST_GENERATION_QUEUE,
+  TestGenerationJobData,
+} from '@openreview/coverage-lib';
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {
-  private readonly queue: Queue<PrAnalysisJobData>;
+  private readonly prAnalysisQueue: Queue<PrAnalysisJobData>;
+  private readonly testGenerationQueue: Queue<TestGenerationJobData>;
 
   constructor() {
-    this.queue = new Queue<PrAnalysisJobData>(PR_ANALYSIS_QUEUE, {
-      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+    const connection = {
+      url: process.env.REDIS_URL ?? 'redis://localhost:6379',
+    };
+
+    this.prAnalysisQueue = new Queue<PrAnalysisJobData>(PR_ANALYSIS_QUEUE, {
+      connection,
     });
+    this.testGenerationQueue = new Queue<TestGenerationJobData>(
+      TEST_GENERATION_QUEUE,
+      { connection },
+    );
   }
 
   async enqueuePrAnalysis(data: PrAnalysisJobData) {
-    return this.queue.add('analyze-pr', data, {
+    return this.prAnalysisQueue.add('analyze-pr', data, {
+      attempts: 2,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
+  }
+
+  async enqueueTestGeneration(data: TestGenerationJobData) {
+    return this.testGenerationQueue.add('generate-test', data, {
       attempts: 2,
       backoff: { type: 'exponential', delay: 5000 },
       removeOnComplete: 100,
@@ -22,6 +45,9 @@ export class QueueService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await this.queue.close();
+    await Promise.all([
+      this.prAnalysisQueue.close(),
+      this.testGenerationQueue.close(),
+    ]);
   }
 }

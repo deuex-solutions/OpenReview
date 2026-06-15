@@ -83,11 +83,13 @@ curl -X POST http://localhost:3000/repositories \
 | GET | `/repositories` | List repositories |
 | GET | `/repositories/:id` | Get repository with recent PR runs |
 | POST | `/repositories/:id/analyze` | Trigger analysis by PR # |
+| POST | `/repositories/:id/generate-test` | Generate unit test for a single file (`filePath` optional — auto-picks from diff coverage when omitted) |
 | POST | `/webhooks/github` | GitHub webhook handler |
 | GET | `/pr-runs/:id` | Get PR run results |
 | GET | `/pr-runs/:id/tests/:testId` | Download generated test |
 | POST | `/pr-runs/:id/retry` | Re-enqueue analysis |
 | GET | `/pr-runs/repository/:repositoryId` | List runs for a repo |
+| GET | `/test-generation-runs/:id` | Get test generation run status and JSON result (`generatedTest.fileName`, `generatedTest.content`) |
 
 ## Integration with OpenReview
 

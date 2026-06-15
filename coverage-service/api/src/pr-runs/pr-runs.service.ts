@@ -61,6 +61,7 @@ export class PrRunsService {
         targetFile: t.targetFile,
         passed: t.passed,
         downloadUrl: `/pr-runs/${run.id}/tests/${t.id}`,
+        fileContent: t.content,
       })),
       logs: run.executionLogs.map((l) => ({
         level: l.level,

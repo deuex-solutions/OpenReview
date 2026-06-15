@@ -16,6 +16,7 @@ model Repository {
   installCommand  String          @default("")
   createdAt       DateTime        @default(now())
   pullRequestRuns PullRequestRun[]
+  testGenerationRuns TestGenerationRun[]
 }
 
 enum PrRunStatus {
@@ -72,15 +73,52 @@ model CoverageResult {
   createdAt            DateTime       @default(now())
 }
 
+enum TestGenerationStatus {
+  PENDING
+  CLONING
+  GENERATING_TESTS
+  COMPLETED
+  FAILED
+}
+
+model TestGenerationRun {
+  id           String               @id @default(cuid())
+  repositoryId String
+  repository   Repository           @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  prNumber     Int
+  targetFile   String
+  headBranch   String?
+  baseBranch   String?
+  status       TestGenerationStatus @default(PENDING)
+  attempts     Int                  @default(0)
+  startedAt    DateTime             @default(now())
+  completedAt  DateTime?
+  generatedTest GeneratedTestArtifact?
+  executionLogs TestGenerationLog[]
+
+  @@index([repositoryId, prNumber])
+}
+
+model TestGenerationLog {
+  id        String            @id @default(cuid())
+  runId     String
+  run       TestGenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  level     String            @default("info")
+  message   String            @db.Text
+  createdAt DateTime          @default(now())
+}
+
 model GeneratedTestArtifact {
-  id         String         @id @default(cuid())
-  prRunId    String
-  prRun      PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
-  filePath   String
-  targetFile String
-  content    String         @db.Text
-  passed     Boolean?
-  createdAt  DateTime       @default(now())
+  id                  String             @id @default(cuid())
+  prRunId             String?
+  prRun               PullRequestRun?    @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  testGenerationRunId String?            @unique
+  testGenerationRun   TestGenerationRun? @relation(fields: [testGenerationRunId], references: [id], onDelete: Cascade)
+  filePath            String
+  targetFile          String
+  content             String             @db.Text
+  passed              Boolean?
+  createdAt           DateTime           @default(now())
 }
 
 model ExecutionLog {

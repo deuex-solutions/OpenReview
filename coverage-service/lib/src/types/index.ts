@@ -150,3 +150,22 @@ export interface PrRunResult {
 }
 
 export const PR_ANALYSIS_QUEUE = 'pr-analysis';
+
+export type TestGenerationStatus =
+  | 'PENDING'
+  | 'CLONING'
+  | 'GENERATING_TESTS'
+  | 'COMPLETED'
+  | 'FAILED';
+
+export interface TestGenerationJobData {
+  runId: string;
+  repositoryId: string;
+  prNumber: number;
+  /** Omitted when the worker should auto-pick from PR diff coverage. */
+  targetFile?: string;
+  baseBranch: string;
+  headBranch: string;
+}
+
+export const TEST_GENERATION_QUEUE = 'test-generation';
