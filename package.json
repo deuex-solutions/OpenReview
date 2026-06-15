@@ -18,7 +18,14 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "review": "node cli/dist/main.mjs review"
+    "review": "node cli/dist/main.mjs review",
+    "coverage:build": "pnpm --filter @openreview/coverage-lib build && pnpm --filter @openreview/coverage-api exec prisma generate && pnpm --filter @openreview/coverage-api build && pnpm --filter @openreview/coverage-worker build",
+    "coverage:db:generate": "pnpm --filter @openreview/coverage-api exec prisma generate",
+    "coverage:db:migrate": "pnpm --filter @openreview/coverage-api exec prisma migrate deploy",
+    "coverage:db:push": "pnpm --filter @openreview/coverage-api exec prisma db push",
+    "coverage:dev:api": "pnpm --filter @openreview/coverage-api start:dev",
+    "coverage:dev:worker": "pnpm --filter @openreview/coverage-worker start:dev",
+    "coverage:setup:worker-deps": "pnpm --filter @openreview/coverage-worker setup:deps"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
