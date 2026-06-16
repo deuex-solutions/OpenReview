@@ -62,16 +62,21 @@ export class ReviewQueue {
 /**
  * Compose a deterministic job ID from semantic identifiers. Different shapes
  * dedup on different fields so we don't accidentally drop legitimate retries.
+ *
+ * IMPORTANT: BullMQ rejects custom job IDs that contain `:` — it uses that
+ * character as the internal Redis key separator. Use `~` between parts and
+ * keep `/`, `#`, `@` (all of which BullMQ accepts).
  */
 function buildJobId(job: OpenReviewJob): string {
-  const base = `${job.kind}:${job.owner}/${job.repo}#${job.prNumber}`;
+  const base = `${job.kind}~${job.owner}/${job.repo}#${job.prNumber}`;
   switch (job.kind) {
     case 'review-fast':
     case 'review-rlm':
+    case 'coverage-analysis':
       return `${base}@${job.headSha}`;
     case 'chat':
     case 'learnings-list':
     case 'learnings-forget':
-      return `${base}@comment:${job.commentId}`;
+      return `${base}@comment-${job.commentId}`;
   }
 }

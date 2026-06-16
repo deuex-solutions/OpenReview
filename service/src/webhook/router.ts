@@ -3,7 +3,7 @@ import type { ReviewQueue } from '../jobs/queue.js';
 import type { Logger } from '../logger.js';
 
 import { handleComment } from './handlers/issue-comment.js';
-import { handlePullRequest } from './handlers/pull-request.js';
+import { handlePullRequest, type PullRequestHandlerOptions } from './handlers/pull-request.js';
 import type {
   CommentPayload,
   HandlerResult,
@@ -14,6 +14,7 @@ export interface WebhookRouterDeps {
   queue: ReviewQueue;
   downstream: DownstreamDispatcher;
   logger: Logger;
+  pullRequestOptions: PullRequestHandlerOptions;
 }
 
 /**
@@ -34,7 +35,12 @@ export async function routeWebhook(
 ): Promise<HandlerResult> {
   switch (event) {
     case 'pull_request':
-      return handlePullRequest(deliveryId, payload as PullRequestPayload, deps);
+      return handlePullRequest(deliveryId, payload as PullRequestPayload, {
+        queue: deps.queue,
+        downstream: deps.downstream,
+        logger: deps.logger,
+        options: deps.pullRequestOptions,
+      });
 
     case 'pull_request_review_comment':
     case 'issue_comment':

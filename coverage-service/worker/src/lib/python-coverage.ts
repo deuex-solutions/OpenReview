@@ -5,7 +5,7 @@ import type { ChangedFile, RepositoryProvider } from '@openreview/coverage-lib';
 import { pythonBin } from './python-bin';
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function isTestFile(path: string): boolean {

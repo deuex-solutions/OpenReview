@@ -61,6 +61,25 @@ const ConfigSchema = z.object({
   jobBackoffMs: numberFromEnv(5000),
   jobKeepCompleted: numberFromEnv(200),
   jobKeepFailed: numberFromEnv(500),
+
+  // Coverage Service integration (downstream microservice that runs diff
+  // coverage + LLM unit-test generation). When disabled the OpenReview
+  // service still performs code review — the coverage pipeline is opt-in.
+  coverageServiceEnabled: z
+    .string()
+    .optional()
+    .transform((raw) => raw?.toLowerCase() === 'true'),
+  coverageServiceUrl: stringOrEmpty,
+  /** Optional shared secret. Sent as `x-api-key`; ignored by the service if unset. */
+  coverageServiceApiKey: stringOrEmpty,
+  coverageServicePollIntervalMs: numberFromEnv(5000),
+  coverageServicePollTimeoutMs: numberFromEnv(1_800_000), // 30 minutes
+  coverageServiceBranchPrefix: stringOrEmpty,
+  /** Defaults passed when auto-registering a previously unseen repo. */
+  coverageServiceDefaultBranch: stringOrEmpty,
+  coverageServiceCoverageCommand: stringOrEmpty,
+  coverageServiceTestCommand: stringOrEmpty,
+  coverageServiceInstallCommand: stringOrEmpty,
 });
 
 export type ServiceConfig = z.infer<typeof ConfigSchema> & {
@@ -94,6 +113,19 @@ export function loadServiceConfig(): ServiceConfig {
     jobBackoffMs: process.env.JOB_BACKOFF_MS,
     jobKeepCompleted: process.env.JOB_KEEP_COMPLETED,
     jobKeepFailed: process.env.JOB_KEEP_FAILED,
+
+    coverageServiceEnabled: process.env.COVERAGE_SERVICE_ENABLED,
+    coverageServiceUrl: process.env.COVERAGE_SERVICE_URL,
+    coverageServiceApiKey: process.env.COVERAGE_SERVICE_API_KEY,
+    coverageServicePollIntervalMs: process.env.COVERAGE_SERVICE_POLL_INTERVAL_MS,
+    coverageServicePollTimeoutMs: process.env.COVERAGE_SERVICE_POLL_TIMEOUT_MS,
+    coverageServiceBranchPrefix:
+      process.env.COVERAGE_SERVICE_BRANCH_PREFIX || 'openreview/tests',
+    coverageServiceDefaultBranch:
+      process.env.COVERAGE_SERVICE_DEFAULT_BRANCH || 'main',
+    coverageServiceCoverageCommand: process.env.COVERAGE_SERVICE_COVERAGE_COMMAND,
+    coverageServiceTestCommand: process.env.COVERAGE_SERVICE_TEST_COMMAND,
+    coverageServiceInstallCommand: process.env.COVERAGE_SERVICE_INSTALL_COMMAND,
   });
 
   return {
@@ -112,6 +144,11 @@ export function assertConfigReady(cfg: ServiceConfig): void {
   if (!cfg.githubWebhookSecret) missing.push('GITHUB_WEBHOOK_SECRET');
   if (!cfg.githubPat) missing.push('GITHUB_PAT (or GITHUB_TOKEN)');
   if (!cfg.redisUrl) missing.push('REDIS_URL');
+
+  if (cfg.coverageServiceEnabled) {
+    if (!cfg.coverageServiceUrl) missing.push('COVERAGE_SERVICE_URL');
+    // COVERAGE_SERVICE_API_KEY is optional — only sent if non-empty.
+  }
 
   if (missing.length > 0) {
     throw new Error(

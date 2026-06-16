@@ -43,12 +43,42 @@ export interface LearningsForgetJob extends JobBase {
   commentId: number;
 }
 
+/**
+ * Dispatched alongside review jobs when `COVERAGE_SERVICE_ENABLED=true`.
+ *
+ * The Coverage Service is a separate microservice that:
+ *   1. Clones the repo at headSha + baseBranch.
+ *   2. Runs the configured `testCommand` with coverage instrumentation.
+ *   3. Asks an LLM to generate unit tests for the largest coverage gaps.
+ *   4. Re-runs tests to validate the generated files.
+ *
+ * Our worker only orchestrates the three REST calls and authors a stacked
+ * PR with the resulting test files.
+ *
+ * `prRunId` is populated AFTER the first successful `POST /repositories/:id/analyze`
+ * and persisted back onto the job (via `job.updateData`) so BullMQ retries
+ * resume polling the existing run instead of starting a brand new one.
+ */
+export interface CoverageAnalysisJob extends JobBase {
+  kind: 'coverage-analysis';
+  headSha: string;
+  baseSha: string;
+  /** PR base ref — used to set the run's `baseBranch` on the coverage service. */
+  baseRef: string;
+  /** PR head ref — also the base branch of the stacked test PR. */
+  headRef: string;
+  title: string;
+  /** Set after the first analyze call; survives retries via job.updateData. */
+  prRunId?: string;
+}
+
 export type OpenReviewJob =
   | FastReviewJob
   | RlmReviewJob
   | ChatJob
   | LearningsListJob
-  | LearningsForgetJob;
+  | LearningsForgetJob
+  | CoverageAnalysisJob;
 
 export type OpenReviewJobKind = OpenReviewJob['kind'];
 

@@ -13,9 +13,17 @@ const VALID_ACTIONS = new Set([
 
 const SKIP_MARKER = 'openreview: skip';
 
+export interface PullRequestHandlerOptions {
+  /** Toggle from config — when false, no coverage-analysis job is enqueued. */
+  coverageServiceEnabled: boolean;
+}
+
 /**
- * Handle pull_request events. Enqueues a fast review job and forwards a
- * normalized payload to any registered downstream dispatcher.
+ * Handle pull_request events.
+ *
+ * Always enqueues a fast review. When `coverageServiceEnabled` is on, ALSO
+ * enqueues a coverage-analysis job — the two run independently so coverage
+ * latency (clone + install + run + LLM) never blocks the review path.
  */
 export async function handlePullRequest(
   deliveryId: string,
@@ -24,6 +32,7 @@ export async function handlePullRequest(
     queue: ReviewQueue;
     downstream: DownstreamDispatcher;
     logger: Logger;
+    options: PullRequestHandlerOptions;
   },
 ): Promise<HandlerResult> {
   const action = payload.action;
@@ -44,6 +53,9 @@ export async function handlePullRequest(
   const repo = payload.repository.name;
   const prNumber = pr.number;
   const headSha = pr.head.sha;
+  const baseSha = pr.base.sha;
+  const headRef = pr.head.ref;
+  const baseRef = pr.base.ref;
 
   await deps.downstream.forwardPullRequest({
     deliveryId,
@@ -53,13 +65,13 @@ export async function handlePullRequest(
     repo,
     prNumber,
     headSha,
-    baseSha: pr.base.sha,
+    baseSha,
     author: pr.user.login,
     isDraft: pr.draft,
     title: pr.title,
   });
 
-  const enqueued = await deps.queue.enqueue({
+  const reviewEnqueued = await deps.queue.enqueue({
     kind: 'review-fast',
     deliveryId,
     owner,
@@ -68,7 +80,30 @@ export async function handlePullRequest(
     headSha,
   });
 
-  return enqueued
-    ? { status: 'enqueued', jobKind: 'review-fast' }
-    : { status: 'duplicate', reason: 'same (repo, pr, headSha) already queued' };
+  const alsoEnqueued: string[] = [];
+  if (deps.options.coverageServiceEnabled) {
+    const coverageEnqueued = await deps.queue.enqueue({
+      kind: 'coverage-analysis',
+      deliveryId,
+      owner,
+      repo,
+      prNumber,
+      headSha,
+      baseSha,
+      baseRef,
+      headRef,
+      title: pr.title,
+    });
+    if (coverageEnqueued) alsoEnqueued.push('coverage-analysis');
+  }
+
+  if (!reviewEnqueued) {
+    return alsoEnqueued.length > 0
+      ? { status: 'enqueued', jobKind: 'coverage-analysis' }
+      : { status: 'duplicate', reason: 'same (repo, pr, headSha) already queued' };
+  }
+
+  return alsoEnqueued.length > 0
+    ? { status: 'enqueued', jobKind: 'review-fast', alsoEnqueued }
+    : { status: 'enqueued', jobKind: 'review-fast' };
 }

@@ -7,6 +7,7 @@ import { assertConfigReady, loadServiceConfig } from './config.js';
 import { createPatAuth } from './github/auth.js';
 import { createRedisConnection } from './jobs/connection.js';
 import { processChat } from './jobs/processors/chat.js';
+import { processCoverageAnalysis } from './jobs/processors/coverage-analysis.js';
 import {
   processLearningsForget,
   processLearningsList,
@@ -14,7 +15,7 @@ import {
 import { processFastReview } from './jobs/processors/review.js';
 import { processRlmReview } from './jobs/processors/rlm.js';
 import { QUEUE_NAME } from './jobs/types.js';
-import type { OpenReviewJob } from './jobs/types.js';
+import type { CoverageAnalysisJob, OpenReviewJob } from './jobs/types.js';
 import { createLogger } from './logger.js';
 
 /**
@@ -53,6 +54,15 @@ async function main(): Promise<void> {
           return processLearningsList(data, { auth, logger });
         case 'learnings-forget':
           return processLearningsForget(data, { auth, logger });
+        case 'coverage-analysis':
+          return processCoverageAnalysis(data, {
+            auth,
+            logger,
+            cfg,
+            persistJobData: async (next: CoverageAnalysisJob) => {
+              await job.updateData(next);
+            },
+          });
       }
     },
     { connection, concurrency: cfg.workerConcurrency },

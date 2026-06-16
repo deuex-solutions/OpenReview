@@ -3,7 +3,7 @@ import { join, relative } from 'path';
 import type { ChangedFile, RepositoryProvider } from '@openreview/coverage-lib';
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function normalizePath(p: string): string {

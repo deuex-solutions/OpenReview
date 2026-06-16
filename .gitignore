@@ -23,5 +23,9 @@ Thumbs.db
 .cursor/rules/openmemory.mdc
 CLAUDE.md
 /coverage/
+# Generated test-coverage reports, but NOT the dispatch source dir of the same name.
+!service/src/dispatch/coverage/
 
 .pnpm-store/
+
+/coverage-service/worker/.venv-tools/
