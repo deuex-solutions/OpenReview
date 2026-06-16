@@ -5,10 +5,10 @@ import type { ReviewQueue } from '../../jobs/queue.js';
 import type { OpenReviewJob } from '../../jobs/types.js';
 import type { Logger } from '../../logger.js';
 
-import { handlePullRequest } from './pull-request.js';
+import { handlePullRequest, type PullRequestHandlerOptions } from './pull-request.js';
 import type { PullRequestPayload } from './types.js';
 
-function deps() {
+function deps(options: Partial<PullRequestHandlerOptions> = {}) {
   const enqueued: OpenReviewJob[] = [];
   const queue = {
     enqueue: vi.fn(async (job: OpenReviewJob) => {
@@ -26,7 +26,12 @@ function deps() {
 
   const logger = { info: () => {}, debug: () => {}, child: () => logger } as unknown as Logger;
 
-  return { queue, downstream, logger, enqueued, forwarded };
+  const merged: PullRequestHandlerOptions = {
+    coverageServiceEnabled: false,
+    ...options,
+  };
+
+  return { queue, downstream, logger, options: merged, enqueued, forwarded };
 }
 
 function payload(action: string, overrides: Partial<PullRequestPayload['pull_request']> = {}): PullRequestPayload {
@@ -39,8 +44,8 @@ function payload(action: string, overrides: Partial<PullRequestPayload['pull_req
       body: '',
       draft: false,
       user: { login: 'human' },
-      head: { sha: 'aaaa1111' },
-      base: { sha: 'bbbb2222' },
+      head: { sha: 'aaaa1111', ref: 'feature/foo' },
+      base: { sha: 'bbbb2222', ref: 'main' },
       ...overrides,
     },
   };
@@ -90,5 +95,44 @@ describe('handlePullRequest', () => {
     expect(fwd.owner).toBe('Kenil27');
     expect(fwd.repo).toBe('band');
     expect(fwd.prNumber).toBe(1);
+  });
+
+  describe('with COVERAGE_SERVICE_ENABLED=true', () => {
+    it('also enqueues a coverage-analysis job', async () => {
+      const d = deps({ coverageServiceEnabled: true });
+      const result = await handlePullRequest('d7', payload('opened'), d);
+      expect(result).toEqual({
+        status: 'enqueued',
+        jobKind: 'review-fast',
+        alsoEnqueued: ['coverage-analysis'],
+      });
+      expect(d.enqueued).toHaveLength(2);
+      const coverageJob = d.enqueued.find((j) => j.kind === 'coverage-analysis');
+      expect(coverageJob).toBeDefined();
+      expect(coverageJob).toMatchObject({
+        kind: 'coverage-analysis',
+        owner: 'Kenil27',
+        repo: 'band',
+        prNumber: 1,
+        headSha: 'aaaa1111',
+        baseSha: 'bbbb2222',
+        headRef: 'feature/foo',
+        baseRef: 'main',
+        title: 'Test PR',
+      });
+    });
+
+    it('still ignores drafts when coverage service is enabled', async () => {
+      const d = deps({ coverageServiceEnabled: true });
+      const result = await handlePullRequest('d8', payload('opened', { draft: true }), d);
+      expect(result.status).toBe('ignored');
+      expect(d.enqueued).toHaveLength(0);
+    });
+  });
+
+  it('omits the coverage-analysis job when disabled', async () => {
+    const d = deps({ coverageServiceEnabled: false });
+    await handlePullRequest('d9', payload('opened'), d);
+    expect(d.enqueued.map((j) => j.kind)).toEqual(['review-fast']);
   });
 });

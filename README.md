@@ -182,6 +182,204 @@ When Deno is not installed, RLM automatically operates in reasoning-only mode �
 
 Triggered via `@openreview rlm` or `--mode rlm`.
 
+## Coverage Service — Automated Unit-Test Generation
+
+A separate **coverage-service** microservice (`coverage-service/`) sits behind OpenReview and:
+
+1. Clones the PR at its head SHA.
+2. Runs `npm test` under `c8 --reporter=cobertura` to measure coverage.
+3. Runs Python `diff-cover` to compute coverage *on the PR's changed lines only*.
+4. Asks an LLM (OpenAI / Anthropic) to generate unit tests for files below the threshold.
+5. Verifies the new tests pass with `node --test`, then recomputes coverage.
+
+OpenReview then takes those generated files, **opens a stacked PR** against the original feature branch, and **posts a coverage-delta comment** on the original PR. See [Kenil27/band#4](https://github.com/Kenil27/band/pull/4) for an example.
+
+### Architecture
+
+```text
+                              ┌────────────────────────────────────────────┐
+GitHub PR ─► webhook OR curl ─►│ OpenReview service                         │
+                              │   • POST /webhook    (webhook path)        │
+                              │   • POST /coverage-runs/trigger (curl path)│
+                              └─────────────┬──────────────────────────────┘
+                                            │  POST /repositories
+                                            │  POST /repositories/:id/analyze
+                                            │  GET  /pr-runs/:id   (polled)
+                                            ▼
+                              ┌────────────────────────────────────────────┐
+                              │ coverage-service (NestJS API + BullMQ worker)│
+                              │   clone → install → c8 → diff-cover →       │
+                              │   LLM test gen → node --test → re-cover    │
+                              └─────────────┬──────────────────────────────┘
+                                            │  generatedTestFiles[]
+                                            ▼
+                              ┌────────────────────────────────────────────┐
+                              │ OpenReview worker                          │
+                              │   • commit test files to                   │
+                              │     openreview/tests/pr-<N>                │
+                              │   • open stacked PR → feature branch       │
+                              │   • post coverage-delta comment on PR      │
+                              └────────────────────────────────────────────┘
+```
+
+### Prerequisites
+
+| Dep | What | How |
+|---|---|---|
+| **Node 20+** | Runs every service | `node -v` |
+| **pnpm** | Package manager | `pnpm -v` |
+| **Postgres** | Coverage-service Prisma DB (`prcoverage`) | `createdb prcoverage` (or your DB UI) |
+| **Redis** | BullMQ for both services (queue names are disjoint, safe to share) | `brew services start redis` / `docker run redis` |
+| **Python 3** + **diff-cover** | The coverage worker shells out to it | `pnpm coverage:setup:worker-deps` (creates `coverage-service/worker/.venv-tools/`) |
+| **GitHub PAT** | One token used by every service for clone + comment + PR-author | See **PAT scopes** below |
+| **OpenAI key** | LLM that writes the tests (Anthropic also supported) | Paste into `coverage-service/.env` → `OPENAI_API_KEY=` |
+
+#### GitHub PAT scopes (critical — this is the most common failure)
+
+OpenReview's PR-author path needs to create git blobs → trees → commits → refs. The review-only path (just commenting on a PR) only needs `pull-requests: write`, but **opening a stacked PR additionally needs `contents: write`**.
+
+- **Fine-grained PAT** (`github_pat_…`): the token must explicitly grant the target repo:
+  - **Contents** → Read **and write**
+  - **Pull requests** → Read **and write**
+  - Metadata is auto-granted.
+- **Classic PAT** (`ghp_…`): the single `repo` scope covers everything we need. Easiest if you don't want to fiddle with fine-grained permissions.
+
+After regenerating the token, **the same value must be in all three `.env` files** (the rotated token will 401 wherever it isn't updated):
+
+```
+.env                      # root — used by @openreview/core (CLI / action)
+service/.env              # OpenReview service (web + worker)
+coverage-service/.env     # coverage-service (api + worker)
+```
+
+### One-time setup
+
+```bash
+# 1. Install deps + build everything
+pnpm install
+pnpm build
+
+# 2. Configure env files (copy templates, paste your secrets)
+cp .env.example .env                                # GITHUB_PAT, OPENAI_API_KEY, ...
+cp service/.env.example service/.env                # add the same GITHUB_PAT
+cp coverage-service/.env.example coverage-service/.env  # add the same GITHUB_PAT + OPENAI_API_KEY
+
+# 3. Generate the Prisma client + push the schema to Postgres
+pnpm coverage:db:generate
+pnpm coverage:db:push
+
+# 4. Install the Python diff-cover binary the coverage worker shells out to
+pnpm coverage:setup:worker-deps
+
+# 5. Enable the integration on the OpenReview side
+#    Add to service/.env (already in .env.example):
+#       COVERAGE_SERVICE_ENABLED=true
+#       COVERAGE_SERVICE_URL=http://localhost:3010
+```
+
+### Run the stack (4 terminals)
+
+| # | Command | Binds | Role |
+|---|---|---|---|
+| 1 | `pnpm coverage:dev:api` | `:3010` | Coverage-service HTTP API (Nest) |
+| 2 | `pnpm coverage:dev:worker` | (none) | Coverage-service worker — does the actual clone + coverage + LLM work |
+| 3 | `pnpm --filter @openreview/service start:web` | `:3003` | OpenReview HTTP — webhooks + `/coverage-runs/trigger` |
+| 4 | `pnpm --filter @openreview/service start:worker` | (none) | OpenReview worker — opens the stacked PR + posts the comment |
+
+> Ports are configurable. `:3010` is `API_PORT` in `coverage-service/.env`; `:3003` is `PORT` in `service/.env`.
+
+### Verified end-to-end flow (curl path, no webhook needed)
+
+This is the exact sequence verified on [Kenil27/band#3 → #4](https://github.com/Kenil27/band/pull/4).
+
+```bash
+# ── Step 1: register the repo with the coverage service (idempotent) ──
+REPO_ID=$(curl -sS -X POST http://localhost:3010/repositories \
+  -H 'Content-Type: application/json' \
+  -d '{"githubRepo":"<owner>/<repo>"}' | jq -r .id)
+echo "repo: $REPO_ID"
+
+# ── Step 2: trigger coverage analysis on a specific PR ──
+PR_RUN_ID=$(curl -sS -X POST "http://localhost:3010/repositories/$REPO_ID/analyze" \
+  -H 'Content-Type: application/json' \
+  -d '{"prNumber": <pr-number>}' | jq -r .prRunId)
+echo "prRun: $PR_RUN_ID"
+
+# ── Step 3 (optional): watch the coverage-service run progress ──
+#    Statuses cycle: PENDING → CLONING → RUNNING_COVERAGE → ANALYZING
+#                  → GENERATING_TESTS → RUNNING_TESTS → RECALCULATING → COMPLETED
+curl -sS "http://localhost:3010/pr-runs/$PR_RUN_ID" | jq '{status, diffCoverageBefore, diffCoverageAfter, generatedTestsCount, executionStatus}'
+
+# ── Step 4: hand the prRunId to OpenReview to open the stacked PR ──
+#    Safe to call before, during, or after the coverage run completes — OpenReview
+#    will poll for the terminal status and only then commit + open the PR.
+curl -sS -X POST http://localhost:3003/coverage-runs/trigger \
+  -H 'Content-Type: application/json' \
+  -d "{\"prRunId\":\"$PR_RUN_ID\"}"
+# → 202 { "status": "accepted", "prRunId": "...", "headSha": "..." }
+```
+
+### What you should see when it works
+
+In terminal 4 (OpenReview worker):
+
+```text
+job enqueued                          kind=coverage-analysis
+starting coverage analysis            prRunId=<id>
+resuming polling for existing pr-run
+coverage analysis finished            status=COMPLETED  diffCoverageAfter=100  generatedTests=1
+stacked test PR ready                 branch=openreview/tests/pr-<N>  testPrNumber=<M>  created=true
+```
+
+On GitHub:
+
+- A new branch on the same repo: `openreview/tests/pr-<N>`.
+- A new PR `openreview/tests/pr-<N>` → original PR's feature branch, body containing:
+  - A Before / After / Delta table for diff coverage *and* overall coverage.
+  - A `Test file | Covers | Status` table mapping each generated `filePath` to its `targetFile` with ✅ / ❌ / — for the test execution result.
+- A `[INFO] OpenReview — Coverage` summary comment on the original PR.
+
+### Webhook path (alternative — also supported)
+
+If you'd rather skip the curl trigger and have the pipeline fire automatically on every PR, point a GitHub webhook at OpenReview's `/webhook`:
+
+- **Payload URL**: `https://<your-tunnel>/webhook` (or `http://localhost:3003/webhook` over a tunnel)
+- **Content type**: `application/json`
+- **Secret**: the value of `GITHUB_WEBHOOK_SECRET` in `service/.env`
+- **Events**: `Pull requests` (subscribe to at least `opened`, `synchronize`, `reopened`, `ready_for_review`)
+
+OpenReview will then enqueue a `review-fast` job (posts the inline review) **and** a `coverage-analysis` job (runs the pipeline above) on every PR. The two paths are equivalent; the curl path just lets you trigger on repos that aren't webhook-configured.
+
+### `GET /pr-runs/:id` — response fields OpenReview consumes
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `status` | `PENDING \| CLONING \| RUNNING_COVERAGE \| ANALYZING \| GENERATING_TESTS \| RUNNING_TESTS \| RECALCULATING \| COMPLETED \| FAILED` | Run lifecycle. OpenReview polls until `COMPLETED` or `FAILED`. |
+| `diffCoverageBefore` / `diffCoverageAfter` | `number` | % of PR-changed lines covered before/after generation. |
+| `coverageBefore` / `coverageAfter` | `number` | Overall (whole-repo) coverage before/after. |
+| `fileCoverage[]` | `{ file, before, after }[]` | Per-file deltas — rendered in the summary comment. |
+| `generatedTestFiles[]` | `{ filePath, targetFile, passed, fileContent }[]` | The files OpenReview commits to the stacked PR. `fileContent` is the test source verbatim. |
+| `executionStatus` | `PASS \| FAIL \| PARTIAL \| SKIPPED` | Aggregate of the per-file `passed` flags. |
+| `workflowSummary` | `{ status, thresholdReached, ... }` | Summary the coverage worker emits at the end of the run. |
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `Cannot POST /repositories/.../analyze` (HTML 404) | Hitting the wrong port — coverage-service is on `:3010`, OpenReview on `:3003`. | Use the right port. Confirm with `lsof -iTCP:3010 -sTCP:LISTEN`. |
+| `Repository not found` on analyze | Wrong `repo-id`. `GET /repositories` returns every registered repo — pick the row with the matching `githubRepo`. | Pipe `POST /repositories` straight into the analyze call (see Step 1 above); avoids retyping the cuid. |
+| `GitHub API access forbidden (403) for /git/blobs` | PAT has `pull-requests: write` but not `contents: write`. | Update the fine-grained PAT to **Contents: read & write** (or switch to a classic PAT with `repo`). |
+| `GitHub API access denied for owner/repo` (401) on analyze | PAT was rotated and `coverage-service/.env` still has the old string. | Same token must be in all three `.env` files. `grep -H GITHUB_PAT .env service/.env coverage-service/.env`. |
+| `ModuleNotFoundError: No module named 'diff_cover'` in the coverage worker | The Python venv wasn't created. | `pnpm coverage:setup:worker-deps` (creates `coverage-service/worker/.venv-tools/`). |
+| `Custom Id cannot contain :` from BullMQ | Stale jobId format from a pre-fix build. | `pnpm build && pnpm --filter @openreview/service start:worker` to pick up the new code. |
+| `status: "duplicate"` on `/coverage-runs/trigger` | A job for the same head SHA was already enqueued (and possibly failed). | `redis-cli del 'bull:openreview:coverage-analysis~<owner>/<repo>#<N>@<sha>'` to drop it, then re-trigger. Or push a new commit to bump the head SHA. |
+| Coverage-service worker fails on a React/CRA repo with `Unexpected token '<'` | The current worker runs generated tests with `node --test`, which doesn't understand JSX. | Use a plain Node.js repo for now (a CLI / library). JSX-aware test execution is a known gap. |
+
+### Configuration reference
+
+- All `COVERAGE_SERVICE_*` settings (timeouts, branch prefix, default coverage/test/install commands) live in [`service/.env.example`](service/.env.example).
+- Coverage-service's own settings (DB, Redis, LLM provider, `TEST_THRESHOLD`, `MAX_GENERATION_ATTEMPTS`, `DIFF_COVER_BIN`, worker concurrency) live in [`coverage-service/.env.example`](coverage-service/.env.example).
+
 ## Instruction Files
 
 OpenReview automatically reads these files from your repository to customize reviews:
@@ -220,7 +418,7 @@ pnpm install
 # Build all packages
 pnpm build
 
-# Run tests (321 tests)
+# Run tests (376 tests)
 pnpm test
 
 # Type checking

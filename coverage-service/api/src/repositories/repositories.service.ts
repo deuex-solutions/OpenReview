@@ -6,12 +6,22 @@ import { CreateRepositoryDto } from './dto/create-repository.dto';
 export class RepositoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Idempotent registration. Re-POSTing the same `githubRepo` returns the
+   * existing row instead of failing with a Prisma unique-constraint 500.
+   * We intentionally do NOT mutate stored commands on re-POST — operators
+   * can edit a repo's config through a separate path if/when we add one.
+   */
   create(dto: CreateRepositoryDto) {
-    return this.prisma.repository.create({
-      data: {
+    return this.prisma.repository.upsert({
+      where: { githubRepo: dto.githubRepo },
+      update: {},
+      create: {
         githubRepo: dto.githubRepo,
         defaultBranch: dto.defaultBranch ?? 'main',
-        coverageCommand: dto.coverageCommand ?? 'npx nyc --reporter=cobertura --report-dir=coverage node --test',
+        coverageCommand:
+          dto.coverageCommand ??
+          'npx nyc --reporter=cobertura --report-dir=coverage node --test',
         testCommand: dto.testCommand ?? 'node --test',
         installCommand: dto.installCommand ?? '',
       },

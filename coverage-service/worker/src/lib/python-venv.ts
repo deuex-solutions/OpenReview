@@ -7,7 +7,7 @@ import { runCommand } from './shell';
 export const PR_COVERAGE_VENV = '.pr-coverage-venv';
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 export function venvDir(repoDir: string): string {
