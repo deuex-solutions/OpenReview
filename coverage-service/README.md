@@ -20,6 +20,13 @@ PR diff coverage analysis and LLM unit test generation, integrated into the Open
 | `@openreview/coverage-api` | NestJS API — repos, webhooks, job enqueue |
 | `@openreview/coverage-worker` | BullMQ worker — clone, coverage, test generation, execution |
 
+## Database Step Up:
+
+### 1. Create DB
+```bash
+create db <database-name>
+```
+
 ## Quick Start
 
 ### 1. Configure environment
@@ -29,6 +36,8 @@ cd coverage-service
 cp .env.example .env
 # Edit .env with your GitHub PAT and OpenAI API key
 ```
+
+Note: Create database before booting up coverage service
 
 ### 2. Start services (Docker)
 
