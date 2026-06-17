@@ -8,10 +8,10 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 
-import type { PrismaService } from '../prisma/prisma.service';
-import type { QueueService } from '../queue/queue.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { QueueService } from '../queue/queue.service';
 
-import type { PrRunsService } from './pr-runs.service';
+import { PrRunsService } from './pr-runs.service';
 
 @Controller('pr-runs')
 export class PrRunsController {

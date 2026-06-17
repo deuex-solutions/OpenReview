@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import type { PrAnalysisService } from '../analysis/pr-analysis.service';
-import type { RepositoriesService } from '../repositories/repositories.service';
+import { PrAnalysisService } from '../analysis/pr-analysis.service';
+import { RepositoriesService } from '../repositories/repositories.service';
 
 interface PullRequestPayload {
   action: string;

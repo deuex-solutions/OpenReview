@@ -36,4 +36,13 @@ export default tseslint.config(
       'coverage-service/**/scripts/**',
     ],
   },
+  // NestJS resolves constructor params from emitted decorator metadata — DI
+  // tokens must be value imports, not `import type`. Do not run import-x
+  // consistent-type-imports auto-fix in this package.
+  {
+    files: ['coverage-service/api/**/*.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': 'off',
+    },
+  },
 );

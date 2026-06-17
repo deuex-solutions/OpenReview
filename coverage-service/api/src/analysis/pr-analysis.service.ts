@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { PrismaService } from '../prisma/prisma.service';
-import type { QueueService } from '../queue/queue.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { QueueService } from '../queue/queue.service';
 
 export interface TriggerAnalysisInput {
   repositoryId: string;
