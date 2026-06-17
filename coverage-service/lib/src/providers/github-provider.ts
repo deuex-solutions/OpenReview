@@ -1,11 +1,14 @@
 import { execFile, spawn } from 'child_process';
-import { promisify } from 'util';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { promisify } from 'util';
+
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
-import { ChangedFile } from '../types';
-import {
+
+import type { ChangedFile } from '../types';
+
+import type {
   CheckoutPROptions,
   CloneOptions,
   RepositoryProvider,

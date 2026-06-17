@@ -1,21 +1,21 @@
-import { Job } from 'bullmq';
-import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
-import {
+
+import type {
   PrAnalysisJobData,
   GeneratedTest,
   PrRunStatus,
   ChangedFile,
   CoverageWorkflowSummary,
   DiffCoverageReport,
+  GitHubProvider} from '@openreview/coverage-lib';
+import {
   pathsMatch,
   detectFramework,
   detectLanguage,
   getAnalyzerForFile,
   extractExportedSymbols,
-  GitHubProvider,
   computeDiffCoverageFromGit,
   parseCoberturaXml,
   getTestThresholdPercent,
@@ -28,6 +28,14 @@ import {
   classifyCoverageBlockers,
   buildWorkflowSummary,
 } from '@openreview/coverage-lib';
+import type { Prisma } from '@prisma/client';
+import type { Job } from 'bullmq';
+
+import {
+  buildJsCoverageCommand,
+  buildJsTestCommand,
+  collectJsTestPaths,
+} from '../lib/js-coverage';
 import { prisma } from '../lib/prisma';
 import {
   createCoverageProviderFromEnv,
@@ -35,18 +43,11 @@ import {
   createRepositoryProvider,
   resolveTestGenerationModel,
 } from '../lib/providers';
-import { cleanupDir, findCoverageXml, runCommand } from '../lib/shell';
-import { detectRepoSetup, RepoSetup, setupPythonRepo } from '../lib/repo-setup';
 import {
   buildPythonCoverageCommand,
   buildPythonTestCommand,
   collectPythonTestPaths,
 } from '../lib/python-coverage';
-import {
-  buildJsCoverageCommand,
-  buildJsTestCommand,
-  collectJsTestPaths,
-} from '../lib/js-coverage';
 import {
   buildPipInstallCommand,
   buildNpmInstallCommand,
@@ -54,6 +55,9 @@ import {
   collectTestRunDependencies,
   parseGeneratedTestContent,
 } from '../lib/repo-packages';
+import type { RepoSetup} from '../lib/repo-setup';
+import { detectRepoSetup, setupPythonRepo } from '../lib/repo-setup';
+import { cleanupDir, findCoverageXml, runCommand } from '../lib/shell';
 
 export class PrAnalysisProcessor {
   private readonly repoProvider = createRepositoryProvider();

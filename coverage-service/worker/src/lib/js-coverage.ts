@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
+
 import type { ChangedFile, RepositoryProvider } from '@openreview/coverage-lib';
 
 function shellQuote(value: string): string {

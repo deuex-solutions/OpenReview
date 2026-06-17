@@ -3,12 +3,16 @@
  * Prisma CLI only reads .env next to schema.prisma; our env file lives one
  * level up (coverage-service/.env) so we preload it here for db:* scripts.
  */
-const { spawnSync } = require('node:child_process');
-const { resolve } = require('node:path');
+import { spawnSync } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-require('dotenv').config({ path: resolve(__dirname, '../../.env') });
+import { config } from 'dotenv';
 
-// `prisma generate` validates the schema env() refs but does not connect.
+const here = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(here, '../../.env') });
+
+// `prisma generate` validates schema env() refs but does not connect.
 // CI has no coverage-service/.env — use a throwaway URL so generate succeeds.
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL =
@@ -17,14 +21,14 @@ if (!process.env.DATABASE_URL) {
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
-  console.error('usage: node scripts/with-env.cjs <prisma-subcommand> [args…]');
+  console.error('usage: node scripts/with-env.mjs <prisma-subcommand> [args…]');
   process.exit(1);
 }
 
 const result = spawnSync('pnpm', ['exec', 'prisma', ...args], {
   stdio: 'inherit',
   env: process.env,
-  cwd: resolve(__dirname, '..'),
+  cwd: resolve(here, '..'),
 });
 
 process.exit(result.status ?? 1);

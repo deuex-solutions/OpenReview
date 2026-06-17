@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { GitHubService } from '../github/github.service';
-import { RepositoriesService } from '../repositories/repositories.service';
-import { GenerateTestDto } from './dto/generate-test.dto';
-import { TestGenerationService } from './test-generation.service';
+
+import type { GitHubService } from '../github/github.service';
+import type { RepositoriesService } from '../repositories/repositories.service';
+
+import type { GenerateTestDto } from './dto/generate-test.dto';
+import type { TestGenerationService } from './test-generation.service';
 
 @Controller('repositories')
 export class TestGenerationTriggerController {

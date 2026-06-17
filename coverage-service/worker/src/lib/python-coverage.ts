@@ -1,7 +1,9 @@
 import { existsSync } from 'fs';
 import { readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
+
 import type { ChangedFile, RepositoryProvider } from '@openreview/coverage-lib';
+
 import { pythonBin } from './python-bin';
 
 function shellQuote(value: string): string {

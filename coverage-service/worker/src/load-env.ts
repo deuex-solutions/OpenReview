@@ -1,6 +1,7 @@
-import { config } from 'dotenv';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+
+import { config } from 'dotenv';
 
 const envPaths = [
   // Prefer coverage-service/.env (README setup) over monorepo root .env

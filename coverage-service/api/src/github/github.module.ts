@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+
 import { GitHubService } from './github.service';
 
 @Global()

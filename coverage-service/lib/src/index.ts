@@ -16,9 +16,9 @@ export * from './prompts/test-generation';
 export * from './test-paths';
 export * from './analysis/code-analyzer';
 
+import { AnthropicProvider } from './providers/anthropic-provider';
 import { CovPeekProvider } from './providers/covpeek-provider';
 import { DiffCoverProvider } from './providers/diff-cover-provider';
-import { AnthropicProvider } from './providers/anthropic-provider';
 import { LocalLLMProvider } from './providers/local-llm-provider';
 import { OpenAIProvider } from './providers/openai-provider';
 

@@ -1,11 +1,14 @@
 import './load-env';
-import { Job, Worker } from 'bullmq';
+import type {
+  PrAnalysisJobData,
+  TestGenerationJobData} from '@openreview/coverage-lib';
 import {
   PR_ANALYSIS_QUEUE,
-  PrAnalysisJobData,
-  TEST_GENERATION_QUEUE,
-  TestGenerationJobData,
+  TEST_GENERATION_QUEUE
 } from '@openreview/coverage-lib';
+import type { Job} from 'bullmq';
+import { Worker } from 'bullmq';
+
 import { PrAnalysisProcessor } from './processors/pr-analysis.processor';
 import { TestGenerationProcessor } from './processors/test-generation.processor';
 

@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import {
+
+import type {
   BaselineMetrics,
   CoverageBlocker,
   CoverageBlockerEntry,
@@ -10,6 +11,7 @@ import {
   FileCoverage,
   UncoveredLine,
 } from '../types';
+
 import { pathsMatch } from './cobertura-parser';
 
 export function getEffectiveCoverage(

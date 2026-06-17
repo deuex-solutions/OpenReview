@@ -1,8 +1,10 @@
 import { Body, Controller, Param, Post } from '@nestjs/common';
-import { PrAnalysisService } from './pr-analysis.service';
-import { GitHubService } from '../github/github.service';
-import { RepositoriesService } from '../repositories/repositories.service';
-import { TriggerAnalysisDto } from './dto/trigger-analysis.dto';
+
+import type { GitHubService } from '../github/github.service';
+import type { RepositoriesService } from '../repositories/repositories.service';
+
+import type { TriggerAnalysisDto } from './dto/trigger-analysis.dto';
+import type { PrAnalysisService } from './pr-analysis.service';
 
 @Controller('repositories')
 export class AnalysisController {
