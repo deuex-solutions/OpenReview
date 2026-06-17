@@ -24,6 +24,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Prisma client must exist before coverage-worker tsc runs. generate
+      # only needs a syntactically valid DATABASE_URL — no DB connection.
+      - run: pnpm coverage:db:generate
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm typecheck

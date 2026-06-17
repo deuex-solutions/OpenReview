@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm --filter @openreview/coverage-api run db:generate && tsc",
     "start": "node dist/main.js",
     "start:dev": "tsx watch --clear-screen=false --exclude '**/dist/**' --exclude '**/node_modules/**' --exclude '**/.git/**' src/main.ts",
     "start:stable": "node dist/main.js",
