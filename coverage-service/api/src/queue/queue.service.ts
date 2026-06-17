@@ -1,11 +1,13 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { Queue } from 'bullmq';
+import type { OnModuleDestroy } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import type {
+  PrAnalysisJobData,
+  TestGenerationJobData} from '@openreview/coverage-lib';
 import {
   PR_ANALYSIS_QUEUE,
-  PrAnalysisJobData,
-  TEST_GENERATION_QUEUE,
-  TestGenerationJobData,
+  TEST_GENERATION_QUEUE
 } from '@openreview/coverage-lib';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {

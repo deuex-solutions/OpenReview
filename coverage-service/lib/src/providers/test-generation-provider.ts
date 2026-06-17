@@ -1,4 +1,4 @@
-import { GeneratedTest, TestGenerationContext } from '../types';
+import type { GeneratedTest, TestGenerationContext } from '../types';
 
 export interface TestGenerationProvider {
   readonly name: string;

@@ -1,4 +1,4 @@
-import { ChangedFile } from '../types';
+import type { ChangedFile } from '../types';
 
 export interface CloneOptions {
   repoUrl: string;

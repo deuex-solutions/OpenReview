@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from 'crypto';
+
 import {
   Body,
   Controller,
@@ -6,8 +8,8 @@ import {
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
-import { createHmac, timingSafeEqual } from 'crypto';
-import { WebhooksService } from './webhooks.service';
+
+import type { WebhooksService } from './webhooks.service';
 
 @Controller('webhooks')
 export class WebhooksController {

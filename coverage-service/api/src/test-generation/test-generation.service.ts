@@ -5,8 +5,9 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { QueueService } from '../queue/queue.service';
+
+import type { PrismaService } from '../prisma/prisma.service';
+import type { QueueService } from '../queue/queue.service';
 
 export interface TriggerTestGenerationInput {
   repositoryId: string;

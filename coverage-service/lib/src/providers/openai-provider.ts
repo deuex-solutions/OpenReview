@@ -1,10 +1,11 @@
-import { GeneratedTest, TestGenerationContext } from '../types';
-import { TestGenerationProvider } from './test-generation-provider';
 import {
   buildTestGenerationPrompt,
   buildTestGenerationSystemPrompt,
 } from '../prompts/test-generation';
 import { inferTestFilePath } from '../test-paths';
+import type { GeneratedTest, TestGenerationContext } from '../types';
+
+import type { TestGenerationProvider } from './test-generation-provider';
 
 export interface OpenAIProviderConfig {
   apiKey: string;

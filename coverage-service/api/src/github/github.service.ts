@@ -3,7 +3,8 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { GitHubAuthMode, GitHubProvider } from '@openreview/coverage-lib';
+import type { GitHubAuthMode} from '@openreview/coverage-lib';
+import { GitHubProvider } from '@openreview/coverage-lib';
 
 @Injectable()
 export class GitHubService {

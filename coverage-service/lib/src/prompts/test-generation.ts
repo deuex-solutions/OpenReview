@@ -1,5 +1,5 @@
-import { TestGenerationContext } from '../types';
 import { inferJavaScriptTestFilePath, inferSourceImportPath } from '../test-paths';
+import type { TestGenerationContext } from '../types';
 
 function formatRepoPackages(packages: string[]): string {
   if (packages.length === 0) return '(none detected)';

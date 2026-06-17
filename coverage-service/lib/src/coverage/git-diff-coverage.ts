@@ -1,7 +1,9 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+
+import type { DiffCoverageReport, FileCoverage, UncoveredLine } from '../types';
+
 import { parseCoberturaXml, pathsMatch } from './cobertura-parser';
-import { DiffCoverageReport, FileCoverage, UncoveredLine } from '../types';
 
 const execFileAsync = promisify(execFile);
 

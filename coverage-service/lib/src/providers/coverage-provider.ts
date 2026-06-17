@@ -1,4 +1,4 @@
-import { DiffCoverageReport } from '../types';
+import type { DiffCoverageReport } from '../types';
 
 export interface CoverageProvider {
   readonly name: string;

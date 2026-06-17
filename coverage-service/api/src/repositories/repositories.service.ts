@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateRepositoryDto } from './dto/create-repository.dto';
+
+import type { PrismaService } from '../prisma/prisma.service';
+
+import type { CreateRepositoryDto } from './dto/create-repository.dto';
 
 @Injectable()
 export class RepositoriesService {

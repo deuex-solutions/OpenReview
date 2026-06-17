@@ -1,8 +1,9 @@
+import type {
+  GitHubAuthMode} from '@openreview/coverage-lib';
 import {
   createCoverageProvider,
   createTestGenerationProvider,
-  GitHubProvider,
-  GitHubAuthMode,
+  GitHubProvider
 } from '@openreview/coverage-lib';
 
 export function createRepositoryProvider() {

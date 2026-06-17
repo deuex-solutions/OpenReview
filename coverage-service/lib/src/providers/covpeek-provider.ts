@@ -1,8 +1,10 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { CoverageProvider } from './coverage-provider';
-import { DiffCoverageReport, FileCoverage } from '../types';
+
 import { parseCoberturaXml } from '../coverage/cobertura-parser';
+import type { DiffCoverageReport, FileCoverage } from '../types';
+
+import type { CoverageProvider } from './coverage-provider';
 
 const execFileAsync = promisify(execFile);
 

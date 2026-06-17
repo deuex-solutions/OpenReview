@@ -1,4 +1,4 @@
-import { ImpactedSymbol } from '../types';
+import type { ImpactedSymbol } from '../types';
 
 export interface CodeAnalyzer {
   extractSymbols(

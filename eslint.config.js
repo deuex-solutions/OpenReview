@@ -28,6 +28,12 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'web/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      'web/**',
+      // Small Node bootstrap scripts (not app source) — e.g. Prisma env loader.
+      'coverage-service/**/scripts/**',
+    ],
   },
 );

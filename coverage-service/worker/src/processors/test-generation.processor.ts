@@ -1,13 +1,14 @@
-import { Job } from 'bullmq';
+import { randomUUID } from 'crypto';
 import { mkdir } from 'fs/promises';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
-import {
+
+import type {
   TestGenerationJobData,
   TestGenerationStatus,
   GitHubProvider,
   ChangedFile,
-  DiffCoverageReport,
+  DiffCoverageReport} from '@openreview/coverage-lib';
+import {
   detectFramework,
   detectLanguage,
   getAnalyzerForFile,
@@ -19,6 +20,12 @@ import {
   getTestThresholdPercent,
   pathsMatch,
 } from '@openreview/coverage-lib';
+import type { Job } from 'bullmq';
+
+import {
+  buildJsCoverageCommand,
+  collectJsTestPaths,
+} from '../lib/js-coverage';
 import { prisma } from '../lib/prisma';
 import {
   createCoverageProviderFromEnv,
@@ -26,20 +33,16 @@ import {
   createRepositoryProvider,
   resolveTestGenerationModel,
 } from '../lib/providers';
-import { cleanupDir, findCoverageXml, runCommand } from '../lib/shell';
-import { detectRepoSetup, setupPythonRepo } from '../lib/repo-setup';
 import {
   buildPythonCoverageCommand,
   collectPythonTestPaths,
 } from '../lib/python-coverage';
 import {
-  buildJsCoverageCommand,
-  collectJsTestPaths,
-} from '../lib/js-coverage';
-import {
   collectRepoPackages,
   parseGeneratedTestContent,
 } from '../lib/repo-packages';
+import { detectRepoSetup, setupPythonRepo } from '../lib/repo-setup';
+import { cleanupDir, findCoverageXml, runCommand } from '../lib/shell';
 
 export class TestGenerationProcessor {
   private readonly repoProvider = createRepositoryProvider();

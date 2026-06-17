@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { RepositoriesService } from './repositories.service';
-import { CreateRepositoryDto } from './dto/create-repository.dto';
+
+import type { CreateRepositoryDto } from './dto/create-repository.dto';
+import type { RepositoriesService } from './repositories.service';
 
 @Controller('repositories')
 export class RepositoriesController {
