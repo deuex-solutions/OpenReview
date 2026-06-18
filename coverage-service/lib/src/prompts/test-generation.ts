@@ -1,4 +1,4 @@
-import { inferJavaScriptTestFilePath, inferSourceImportPath } from '../test-paths';
+import { inferJavaScriptTestFilePath, inferSourceImportPath, sourceFileExtension } from '../test-paths';
 import type { TestGenerationContext } from '../types';
 
 function formatRepoPackages(packages: string[]): string {
@@ -136,6 +136,7 @@ Return only the complete test file.`;
 function buildJavaScriptPrompt(ctx: TestGenerationContext, symbols: string): string {
   const testFile = inferJavaScriptTestFilePath(ctx.file);
   const importPath = inferSourceImportPath(testFile, ctx.file);
+  const importExt = sourceFileExtension(ctx.file);
   const repoHasJest = ctx.repoPackages.some((p) => normalizePackageName(p) === 'jest');
   const repoHasVitest = ctx.repoPackages.some((p) => normalizePackageName(p) === 'vitest');
   const useNodeTest = !repoHasJest && !repoHasVitest;
@@ -191,7 +192,7 @@ ${frameworkSection}
 ## Imports (critical)
 ${hasExports
     ? `- Import ONLY from exported symbols listed above via: '${importPath}'
-- Always include the .js extension in relative ESM imports.
+- Always include the ${importExt} extension in relative ESM imports.
 - Never import private/unexported functions — importing them causes SyntaxError.`
     : `- This file has NO exports. Do NOT import functions from it.
 - Test via child_process: spawn node with the script path and CLI args.
@@ -289,7 +290,7 @@ export function buildTestGenerationSystemPrompt(language: string): string {
     return (
       'You write simple, correct JavaScript unit tests that pass on first run. ' +
       'Prefer node:test and node:assert unless the repo already uses Jest/Vitest. ' +
-      'Use correct relative ESM import paths with .js extensions. ' +
+      'Use correct relative ESM import paths with the source file extension (.js, .jsx, .ts, .tsx). ' +
       'Only import symbols listed as exported; never import private functions. ' +
       'For CLI files with no exports, test via child_process.spawnSync instead of importing. ' +
       'Mock all external I/O. Return only runnable test file code. ' +
