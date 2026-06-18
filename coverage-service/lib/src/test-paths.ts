@@ -1,6 +1,36 @@
+/** Extension including dot for a JS/TS source file (.js, .jsx, .ts, .tsx). */
+export function sourceFileExtension(sourceFile: string): string {
+  const match = sourceFile.match(/\.(tsx|jsx|ts|js)$/);
+  return match ? `.${match[1]}` : '.js';
+}
+
+const JS_COLOCATED_TEST_SUFFIXES = [
+  '.test.ts',
+  '.spec.ts',
+  '.test.tsx',
+  '.spec.tsx',
+  '.test.js',
+  '.spec.js',
+  '.test.jsx',
+  '.spec.jsx',
+] as const;
+
+/** Colocated test paths next to a source file (all common JS/TS test suffixes). */
+export function colocatedJavaScriptTestPaths(sourceFile: string): string[] {
+  const baseName = sourceFile.replace(/\.(js|jsx|ts|tsx)$/, '');
+  return JS_COLOCATED_TEST_SUFFIXES.map((suffix) => `${baseName}${suffix}`);
+}
+
+export function isJavaScriptTestFileName(fileName: string): boolean {
+  return (
+    JS_COLOCATED_TEST_SUFFIXES.some((suffix) => fileName.endsWith(suffix)) ||
+    (fileName.startsWith('test_') && /\.(js|jsx|ts|tsx)$/.test(fileName))
+  );
+}
+
 /** Infer a test file path that mirrors src/ under tests/ for JS/TS projects. */
 export function inferJavaScriptTestFilePath(sourceFile: string): string {
-  const ext = /\.tsx?$/.test(sourceFile) ? '.ts' : '.js';
+  const ext = sourceFileExtension(sourceFile);
   const withoutExt = sourceFile.replace(/\.(js|jsx|ts|tsx)$/, '');
 
   if (withoutExt.startsWith('src/')) {
@@ -28,8 +58,7 @@ export function inferSourceImportPath(testFile: string, sourceFile: string): str
   }
 
   if (!/\.(js|jsx|ts|tsx)$/.test(rel)) {
-    const ext = /\.tsx?$/.test(sourceFile) ? '.ts' : '.js';
-    rel += ext;
+    rel += sourceFileExtension(sourceFile);
   }
 
   return rel.startsWith('.') ? rel : `./${rel}`;

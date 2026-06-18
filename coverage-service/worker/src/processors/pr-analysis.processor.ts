@@ -122,6 +122,7 @@ export class PrAnalysisProcessor {
         `Repository cloned to: ${runDir} (cleaned up after run unless KEEP_WORK_DIR=1)`,
       );
 
+
       await this.withProgressHeartbeat(
         data.prRunId,
         `Fetching and checking out PR #${data.prNumber}`,

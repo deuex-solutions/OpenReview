@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
 
-import type { ChangedFile, RepositoryProvider } from '@openreview/coverage-lib';
+import { sourceFileExtension, type ChangedFile, type RepositoryProvider } from '@openreview/coverage-lib';
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
@@ -121,8 +121,12 @@ function coverageToolPrefix(sourcePaths: string[]): string {
     "--exclude='tests/**'",
     "--exclude='**/*.test.js'",
     "--exclude='**/*.spec.js'",
+    "--exclude='**/*.test.jsx'",
+    "--exclude='**/*.spec.jsx'",
     "--exclude='**/*.test.ts'",
     "--exclude='**/*.spec.ts'",
+    "--exclude='**/*.test.tsx'",
+    "--exclude='**/*.spec.tsx'",
     "--exclude='**/node_modules/**'",
   ].join(' ');
 }
@@ -167,7 +171,7 @@ function walkJsTestFiles(dir: string, repoDir: string, results: string[]): void 
       walkJsTestFiles(full, repoDir, results);
     } else if (
       /\.(test|spec)\.(js|jsx|ts|tsx)$/.test(entry) ||
-      (entry.startsWith('test_') && entry.endsWith('.js'))
+      (entry.startsWith('test_') && /\.(js|jsx|ts|tsx)$/.test(entry))
     ) {
       results.push(normalizePath(relative(repoDir, full)));
     }
@@ -183,29 +187,31 @@ function guessTestFileNames(sourcePath: string): string[] {
   const underTests = normalized.startsWith('src/')
     ? normalized.replace(/^src\//, 'tests/').replace(/\.[^.]+$/, '')
     : `tests/${baseName}`;
+  const ext = sourceFileExtension(sourcePath);
 
   return [
-    `${underTests}.test.js`,
-    `${underTests}.spec.js`,
-    `${baseName}.test.js`,
-    `${baseName}.spec.js`,
-    `test_${baseName}.js`,
-    `test_${dirPart}.js`,
-    `tests/${baseName}.test.js`,
-    `tests/test_${baseName}.js`,
-    `test/${baseName}.test.js`,
+    `${underTests}.test${ext}`,
+    `${underTests}.spec${ext}`,
+    `${baseName}.test${ext}`,
+    `${baseName}.spec${ext}`,
+    `test_${baseName}${ext}`,
+    `test_${dirPart}${ext}`,
+    `tests/${baseName}.test${ext}`,
+    `tests/test_${baseName}${ext}`,
+    `test/${baseName}.test${ext}`,
   ];
 }
 
 function testFileMatchesSource(testPath: string, sourcePath: string): boolean {
   const baseName =
     normalizePath(sourcePath).split('/').pop()?.replace(/\.[^.]+$/, '') ?? '';
+  const ext = sourceFileExtension(sourcePath);
   const testBase = testPath.split('/').pop() ?? '';
   return (
     testBase.includes(baseName) ||
-    testBase === `${baseName}.test.js` ||
-    testBase === `${baseName}.spec.js` ||
-    testBase === `test_${baseName}.js`
+    testBase === `${baseName}.test${ext}` ||
+    testBase === `${baseName}.spec${ext}` ||
+    testBase === `test_${baseName}${ext}`
   );
 }
 
