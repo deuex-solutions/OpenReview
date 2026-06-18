@@ -36,12 +36,6 @@ describe('PRAuthor.commitFiles', () => {
       patch: vi.fn(),
     };
 
-    // 1. baseSha tree resolution
-    api.get.mockImplementationOnce(async (url: string) => {
-      expect(url).toBe('/repos/kenil27/band/git/commits/sha-base');
-      return { data: { tree: { sha: 'tree-base' } } };
-    });
-
     // refExists: branch lookup returns 404
     api.get.mockImplementationOnce(async (url: string) => {
       expect(url).toBe('/repos/kenil27/band/git/ref/heads/openreview/tests/pr-1');
@@ -49,6 +43,12 @@ describe('PRAuthor.commitFiles', () => {
         response: { status: 404 },
       });
       throw err;
+    });
+
+    // baseSha tree resolution
+    api.get.mockImplementationOnce(async (url: string) => {
+      expect(url).toBe('/repos/kenil27/band/git/commits/sha-base');
+      return { data: { tree: { sha: 'tree-base' } } };
     });
 
     api.post
@@ -86,6 +86,16 @@ describe('PRAuthor.commitFiles', () => {
       ],
     });
 
+    // Check commit parents on the feature tip for a brand-new branch
+    const commitCall = api.post.mock.calls[2];
+    expect(commitCall[0]).toBe('/repos/kenil27/band/git/commits');
+    expect(commitCall[1]).toEqual(
+      expect.objectContaining({
+        message: 'test: add a',
+        parents: ['sha-base'],
+      }),
+    );
+
     // Check ref creation used the fully qualified ref string and POST (not PATCH)
     const refCall = api.post.mock.calls[3];
     expect(refCall[0]).toBe('/repos/kenil27/band/git/refs');
@@ -96,12 +106,16 @@ describe('PRAuthor.commitFiles', () => {
     expect(api.patch).not.toHaveBeenCalled();
   });
 
-  it('force-updates an existing branch with PATCH', async () => {
+  it('appends a commit when the feature branch has not advanced', async () => {
     const api = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
 
     api.get
-      .mockResolvedValueOnce({ data: { tree: { sha: 'tree-base' } } })
-      .mockResolvedValueOnce({ data: { ref: 'refs/heads/x' } }); // ref exists
+      .mockResolvedValueOnce({ data: { object: { sha: 'tip-old' } } }) // refExists
+      .mockResolvedValueOnce({ data: { object: { sha: 'tip-old' } } }) // getRefSha
+      .mockResolvedValueOnce({
+        data: { merge_base_commit: { sha: 'sha-base' } },
+      }) // isAncestor
+      .mockResolvedValueOnce({ data: { tree: { sha: 'tree-head' } } }); // headSha tree
 
     api.post
       .mockResolvedValueOnce({ data: { sha: 'blob-1' } })
@@ -118,9 +132,64 @@ describe('PRAuthor.commitFiles', () => {
       commitMessage: 'msg',
     });
 
+    const treeCall = api.post.mock.calls[1];
+    expect(treeCall[1]).toEqual({
+      base_tree: 'tree-head',
+      tree: [
+        {
+          path: 'tests/a.test.ts',
+          mode: '100644',
+          type: 'blob',
+          sha: 'blob-1',
+        },
+      ],
+    });
+
+    const commitCall = api.post.mock.calls[2];
+    expect(commitCall[1]).toEqual(
+      expect.objectContaining({
+        parents: ['tip-old'],
+      }),
+    );
+
     expect(api.patch).toHaveBeenCalledWith(
       '/repos/kenil27/band/git/refs/heads/openreview/tests/pr-42',
-      { sha: 'commit-1', force: true },
+      { sha: 'commit-1' },
+    );
+    expect(api.patch.mock.calls[0][1]).not.toHaveProperty('force');
+  });
+
+  it('creates a merge commit when the feature branch has advanced', async () => {
+    const api = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
+
+    api.get
+      .mockResolvedValueOnce({ data: { object: { sha: 'tip-old' } } }) // refExists
+      .mockResolvedValueOnce({ data: { object: { sha: 'tip-old' } } }) // getRefSha
+      .mockResolvedValueOnce({
+        data: { merge_base_commit: { sha: 'merge-old' } },
+      }) // isAncestor — feature tip is NOT merged
+      .mockResolvedValueOnce({ data: { tree: { sha: 'tree-head' } } }); // headSha tree
+
+    api.post
+      .mockResolvedValueOnce({ data: { sha: 'blob-1' } })
+      .mockResolvedValueOnce({ data: { sha: 'tree-1' } })
+      .mockResolvedValueOnce({ data: { sha: 'commit-1' } });
+
+    api.patch.mockResolvedValueOnce({ data: {} });
+
+    const author = new PRAuthor(makeClient(api));
+    await author.commitFiles({
+      branch: 'openreview/tests/pr-42',
+      baseSha: 'sha-head',
+      files: [{ path: 'tests/a.test.ts', content: 'noop' }],
+      commitMessage: 'msg',
+    });
+
+    const commitCall = api.post.mock.calls[2];
+    expect(commitCall[1]).toEqual(
+      expect.objectContaining({
+        parents: ['tip-old', 'sha-head'],
+      }),
     );
   });
 });
@@ -145,6 +214,7 @@ describe('PRAuthor.openOrUpdatePR', () => {
       url: 'https://github.com/kenil27/band/pull/99',
       number: 99,
       created: true,
+      updated: false,
     });
 
     expect(api.get).toHaveBeenCalledWith(
@@ -169,25 +239,54 @@ describe('PRAuthor.openOrUpdatePR', () => {
     );
   });
 
-  it('returns the existing PR without creating a new one', async () => {
-    const api = { get: vi.fn(), post: vi.fn() };
+  it('PATCHes title and body on an existing open PR', async () => {
+    const api = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
     api.get.mockResolvedValueOnce({
       data: [{ number: 7, html_url: 'https://github.com/kenil27/band/pull/7' }],
     });
+    api.patch.mockResolvedValueOnce({ data: {} });
 
     const author = new PRAuthor(makeClient(api));
     const res = await author.openOrUpdatePR({
       base: 'feature/foo',
       head: 'openreview/tests/pr-1',
-      title: 't',
-      body: 'b',
+      title: 'updated title',
+      body: 'updated body',
     });
 
     expect(res).toEqual({
       url: 'https://github.com/kenil27/band/pull/7',
       number: 7,
       created: false,
+      updated: true,
+    });
+    expect(api.patch).toHaveBeenCalledWith('/repos/kenil27/band/pulls/7', {
+      title: 'updated title',
+      body: 'updated body',
     });
     expect(api.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('PRAuthor.branchExists', () => {
+  it('returns true when the branch ref is present', async () => {
+    const api = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
+    api.get.mockResolvedValueOnce({ data: { ref: 'refs/heads/openreview/tests/pr-1' } });
+
+    const author = new PRAuthor(makeClient(api));
+    await expect(author.branchExists('openreview/tests/pr-1')).resolves.toBe(true);
+    expect(api.get).toHaveBeenCalledWith(
+      '/repos/kenil27/band/git/ref/heads/openreview/tests/pr-1',
+    );
+  });
+
+  it('returns false when the branch ref is missing', async () => {
+    const api = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
+    api.get.mockRejectedValueOnce(
+      Object.assign(new Error('not found'), { response: { status: 404 } }),
+    );
+
+    const author = new PRAuthor(makeClient(api));
+    await expect(author.branchExists('openreview/tests/pr-99')).resolves.toBe(false);
   });
 });
