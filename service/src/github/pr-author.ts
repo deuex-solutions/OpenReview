@@ -30,11 +30,19 @@ export class PRAuthor {
   }
 
   /**
-   * Commit one or more files atomically on top of `baseSha`, creating or
-   * fast-forwarding `branch` to point at the new commit.
+   * Commit generated test files on `branch`.
    *
-   * Empty `files` is a no-op that returns `null` so the caller can decide
-   * whether to skip PR creation.
+   * Stacked test PRs target the feature branch (`headRef`) and should only
+   * *show* test-file deltas in the PR diff. We always build the commit tree
+   * from the current feature tip (`baseSha`) plus test overlays — never
+   * re-import an older snapshot of source files.
+   *
+   * History strategy:
+   * - **First push:** single parent = feature tip.
+   * - **Refresh, feature unchanged:** single parent = test-branch tip.
+   * - **Refresh, feature advanced:** merge commit with parents
+   *   `[test-branch tip, feature tip]` so the branch stays aligned with the
+   *   feature branch and GitHub's PR diff does not resurrect `.js` changes.
    */
   async commitFiles(opts: {
     branch: string;
@@ -44,13 +52,24 @@ export class PRAuthor {
   }): Promise<{ branchRef: string; commitSha: string } | null> {
     if (opts.files.length === 0) return null;
 
-    // 1) Resolve the tree SHA at baseSha so we can extend it.
-    const { data: baseCommit } = await this.api.get(
-      `${this.repoPath}/git/commits/${opts.baseSha}`,
-    );
-    const baseTreeSha = baseCommit.tree.sha as string;
+    const refPath = `heads/${opts.branch}`;
+    const fullyQualified = `refs/heads/${opts.branch}`;
+    const headSha = opts.baseSha;
+    const branchExists = await this.refExists(refPath);
 
-    // 2) Upload each file as a blob.
+    let parents: string[];
+    if (!branchExists) {
+      parents = [headSha];
+    } else {
+      const branchTip = await this.getRefSha(refPath);
+      const headMerged =
+        branchTip === headSha ||
+        (await this.isAncestor(headSha, branchTip));
+      parents = headMerged ? [branchTip] : [branchTip, headSha];
+    }
+
+    const baseTreeSha = await this.getCommitTreeSha(headSha);
+
     const blobs = await Promise.all(
       opts.files.map(async (f) => {
         const { data } = await this.api.post(`${this.repoPath}/git/blobs`, {
@@ -61,7 +80,6 @@ export class PRAuthor {
       }),
     );
 
-    // 3) Build a new tree referencing the new blobs.
     const { data: newTree } = await this.api.post(
       `${this.repoPath}/git/trees`,
       {
@@ -75,25 +93,19 @@ export class PRAuthor {
       },
     );
 
-    // 4) Create the commit pointing at the new tree, parented on baseSha.
     const { data: newCommit } = await this.api.post(
       `${this.repoPath}/git/commits`,
       {
         message: opts.commitMessage,
         tree: newTree.sha,
-        parents: [opts.baseSha],
+        parents,
       },
     );
     const commitSha = newCommit.sha as string;
 
-    // 5) Create the branch ref, or fast-forward an existing one.
-    const refPath = `heads/${opts.branch}`;
-    const fullyQualified = `refs/heads/${opts.branch}`;
-    const exists = await this.refExists(refPath);
-    if (exists) {
+    if (branchExists) {
       await this.api.patch(`${this.repoPath}/git/refs/${refPath}`, {
         sha: commitSha,
-        force: true,
       });
     } else {
       await this.api.post(`${this.repoPath}/git/refs`, {
@@ -105,20 +117,35 @@ export class PRAuthor {
     return { branchRef: fullyQualified, commitSha };
   }
 
+  /** Whether `refs/heads/<branch>` already exists (used to pick a commit message). */
+  async branchExists(branch: string): Promise<boolean> {
+    return this.refExists(`heads/${branch}`);
+  }
+
   /**
-   * Open a PR with `head` -> `base`, or return the open one if it exists.
-   * The {@link created} flag tells the caller whether to post a fresh
-   * "tests generated" comment or to skip it.
+   * Open a PR with `head` -> `base`, or refresh title/body on the open one.
+   *
+   * When a matching open PR exists, its title and body are PATCHed so
+   * re-runs after `pull_request.synchronize` show up-to-date coverage stats.
    */
   async openOrUpdatePR(opts: {
     base: string;
     head: string;
     title: string;
     body: string;
-  }): Promise<{ url: string; number: number; created: boolean }> {
+  }): Promise<{ url: string; number: number; created: boolean; updated: boolean }> {
     const existing = await this.findOpenPR(opts.head, opts.base);
     if (existing) {
-      return { url: existing.url, number: existing.number, created: false };
+      await this.api.patch(`${this.repoPath}/pulls/${existing.number}`, {
+        title: opts.title,
+        body: opts.body,
+      });
+      return {
+        url: existing.url,
+        number: existing.number,
+        created: false,
+        updated: true,
+      };
     }
 
     const { data } = await this.api.post(`${this.repoPath}/pulls`, {
@@ -132,10 +159,35 @@ export class PRAuthor {
       url: data.html_url as string,
       number: data.number as number,
       created: true,
+      updated: false,
     };
   }
 
   /* ---- Internal helpers --------------------------------------------- */
+
+  private async getRefSha(refPath: string): Promise<string> {
+    const { data } = await this.api.get(`${this.repoPath}/git/ref/${refPath}`);
+    return data.object.sha as string;
+  }
+
+  private async getCommitTreeSha(commitSha: string): Promise<string> {
+    const { data } = await this.api.get(
+      `${this.repoPath}/git/commits/${commitSha}`,
+    );
+    return data.tree.sha as string;
+  }
+
+  /** True when `ancestorSha` is reachable from `descendantSha` (inclusive). */
+  private async isAncestor(
+    ancestorSha: string,
+    descendantSha: string,
+  ): Promise<boolean> {
+    if (ancestorSha === descendantSha) return true;
+    const { data } = await this.api.get(
+      `${this.repoPath}/compare/${ancestorSha}...${descendantSha}`,
+    );
+    return (data.merge_base_commit?.sha as string | undefined) === ancestorSha;
+  }
 
   private async refExists(refPath: string): Promise<boolean> {
     try {

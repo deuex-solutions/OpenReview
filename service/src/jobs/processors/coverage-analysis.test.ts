@@ -124,6 +124,7 @@ describe('processCoverageAnalysis', () => {
     };
 
     const prAuthor = {
+      branchExists: vi.fn(async () => false),
       commitFiles: vi.fn(async () => ({
         branchRef: 'refs/heads/openreview/tests/pr-1',
         commitSha: 'commit-new',
@@ -132,6 +133,7 @@ describe('processCoverageAnalysis', () => {
         url: 'https://github.com/kenil27/band/pull/99',
         number: 99,
         created: true,
+        updated: false,
       })),
     };
 
@@ -148,7 +150,10 @@ describe('processCoverageAnalysis', () => {
           'findOrCreateRepository' | 'triggerAnalysis' | 'waitForPrRun'
         >,
       prAuthorFactory: () =>
-        prAuthor as unknown as Pick<PRAuthor, 'commitFiles' | 'openOrUpdatePR'>,
+        prAuthor as unknown as Pick<
+          PRAuthor,
+          'branchExists' | 'commitFiles' | 'openOrUpdatePR'
+        >,
     });
 
     expect(coverageClient.findOrCreateRepository).toHaveBeenCalledWith(
@@ -183,6 +188,66 @@ describe('processCoverageAnalysis', () => {
     const summary = (poster.postAcknowledgement as unknown as ReturnType<typeof vi.fn>).mock.calls[1][1] as string;
     expect(summary).toContain('Diff coverage');
     expect(summary).toContain('https://github.com/kenil27/band/pull/99');
+  });
+
+  it('uses a refresh commit message when the stacked branch already exists', async () => {
+    makeRuntime();
+
+    const coverageClient = {
+      findOrCreateRepository: vi.fn(async () => baseRepo),
+      triggerAnalysis: vi.fn(async () => ({ prRunId: 'run-1', status: 'enqueued' })),
+      waitForPrRun: vi.fn(
+        async (): Promise<PrRun> => ({
+          ...baseRun,
+          generatedTestFiles: [
+            {
+              id: 't1',
+              filePath: 'tests/a.test.ts',
+              targetFile: 'src/a.ts',
+              passed: true,
+              fileContent: 'test("x", () => {});',
+            },
+          ],
+        }),
+      ),
+    };
+
+    const prAuthor = {
+      branchExists: vi.fn(async () => true),
+      commitFiles: vi.fn(async () => ({
+        branchRef: 'refs/heads/openreview/tests/pr-1',
+        commitSha: 'commit-refresh',
+      })),
+      openOrUpdatePR: vi.fn(async () => ({
+        url: 'https://github.com/kenil27/band/pull/7',
+        number: 7,
+        created: false,
+        updated: true,
+      })),
+    };
+
+    await processCoverageAnalysis(job, {
+      auth,
+      logger: makeLogger(),
+      cfg,
+      coverageClientFactory: () =>
+        coverageClient as unknown as Pick<
+          CoverageServiceClient,
+          'findOrCreateRepository' | 'triggerAnalysis' | 'waitForPrRun'
+        >,
+      prAuthorFactory: () =>
+        prAuthor as unknown as Pick<
+          PRAuthor,
+          'branchExists' | 'commitFiles' | 'openOrUpdatePR'
+        >,
+    });
+
+    expect(prAuthor.commitFiles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commitMessage: expect.stringContaining('refresh tests for PR #1 @ sha-hea'),
+      }),
+    );
+    expect(prAuthor.openOrUpdatePR).toHaveBeenCalled();
   });
 
   it('skips triggerAnalysis on retry when prRunId is already persisted', async () => {
@@ -220,7 +285,7 @@ describe('processCoverageAnalysis', () => {
       triggerAnalysis: vi.fn(async () => ({ prRunId: 'run-1' })),
       waitForPrRun: vi.fn(async (): Promise<PrRun> => baseRun),
     };
-    const prAuthor = { commitFiles: vi.fn(), openOrUpdatePR: vi.fn() };
+    const prAuthor = { branchExists: vi.fn(), commitFiles: vi.fn(), openOrUpdatePR: vi.fn() };
 
     await processCoverageAnalysis(job, {
       auth,
@@ -232,7 +297,10 @@ describe('processCoverageAnalysis', () => {
           'findOrCreateRepository' | 'triggerAnalysis' | 'waitForPrRun'
         >,
       prAuthorFactory: () =>
-        prAuthor as unknown as Pick<PRAuthor, 'commitFiles' | 'openOrUpdatePR'>,
+        prAuthor as unknown as Pick<
+          PRAuthor,
+          'branchExists' | 'commitFiles' | 'openOrUpdatePR'
+        >,
     });
 
     expect(prAuthor.commitFiles).not.toHaveBeenCalled();
