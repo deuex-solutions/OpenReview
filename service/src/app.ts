@@ -40,6 +40,7 @@ export function createApp(deps: AppDeps): Express {
         logger: deps.logger,
         pullRequestOptions: {
           coverageServiceEnabled: deps.cfg.coverageServiceEnabled,
+          coverageServiceBranchPrefix: deps.cfg.coverageServiceBranchPrefix,
         },
       },
       deps.logger,

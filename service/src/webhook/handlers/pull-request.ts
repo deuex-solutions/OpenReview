@@ -1,4 +1,8 @@
 import type { DownstreamDispatcher } from '../../dispatch/downstream.js';
+import {
+  isStackedTestBranch,
+  OPENREVIEW_SKIP_MARKER,
+} from '../../github/stacked-test-pr.js';
 import type { ReviewQueue } from '../../jobs/queue.js';
 import type { Logger } from '../../logger.js';
 
@@ -11,11 +15,11 @@ const VALID_ACTIONS = new Set([
   'ready_for_review',
 ]);
 
-const SKIP_MARKER = 'openreview: skip';
-
 export interface PullRequestHandlerOptions {
   /** Toggle from config — when false, no coverage-analysis job is enqueued. */
   coverageServiceEnabled: boolean;
+  /** Branch prefix for stacked test PRs — used to skip review on those PRs. */
+  coverageServiceBranchPrefix?: string;
 }
 
 /**
@@ -45,8 +49,19 @@ export async function handlePullRequest(
     return { status: 'ignored', reason: 'draft PR' };
   }
 
-  if (typeof pr.body === 'string' && pr.body.includes(SKIP_MARKER)) {
-    return { status: 'ignored', reason: `PR body contains "${SKIP_MARKER}"` };
+  if (typeof pr.body === 'string' && pr.body.includes(OPENREVIEW_SKIP_MARKER)) {
+    return {
+      status: 'ignored',
+      reason: `PR body contains "${OPENREVIEW_SKIP_MARKER}"`,
+    };
+  }
+
+  const headRef = pr.head.ref;
+  if (isStackedTestBranch(headRef, deps.options.coverageServiceBranchPrefix)) {
+    return {
+      status: 'ignored',
+      reason: 'OpenReview stacked test PR (auto-generated tests)',
+    };
   }
 
   const owner = payload.repository.owner.login;
@@ -54,7 +69,6 @@ export async function handlePullRequest(
   const prNumber = pr.number;
   const headSha = pr.head.sha;
   const baseSha = pr.base.sha;
-  const headRef = pr.head.ref;
   const baseRef = pr.base.ref;
 
   await deps.downstream.forwardPullRequest({
