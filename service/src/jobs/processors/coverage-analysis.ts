@@ -229,7 +229,7 @@ async function openStackedTestPR(args: {
   const opened = await author.openOrUpdatePR({
     base: job.headRef,
     head: branch,
-    title: `[OpenReview] Tests for PR #${job.prNumber}: ${job.title}`,
+    title: `Unit Test for PR #${job.prNumber}: ${job.title}`,
     body: buildTestPRBody({
       run,
       headRef: job.headRef,

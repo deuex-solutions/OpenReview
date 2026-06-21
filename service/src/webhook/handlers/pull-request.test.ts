@@ -86,6 +86,21 @@ describe('handlePullRequest', () => {
     expect(d.enqueued).toHaveLength(0);
   });
 
+  it('ignores OpenReview stacked test PRs (no inline review comments)', async () => {
+    const d = deps({ coverageServiceEnabled: true });
+    const p = payload('opened', {
+      title: '[OpenReview] Tests for PR #6: feat',
+      head: { sha: 'cccc3333', ref: 'openreview/tests/pr-6' },
+    });
+    const result = await handlePullRequest('d5b', p, d);
+    expect(result).toEqual({
+      status: 'ignored',
+      reason: 'OpenReview stacked test PR (auto-generated tests)',
+    });
+    expect(d.enqueued).toHaveLength(0);
+    expect(d.forwarded).toHaveLength(0);
+  });
+
   it('forwards a normalized payload to the downstream dispatcher', async () => {
     const d = deps();
     await handlePullRequest('d6', payload('opened'), d);

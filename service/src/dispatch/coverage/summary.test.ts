@@ -124,4 +124,9 @@ describe('buildTestPRBody', () => {
     expect(out).toContain('✅');
     expect(out).toContain('—');
   });
+
+  it('includes the openreview: skip marker so webhooks ignore this PR', () => {
+    const out = buildTestPRBody({ run: baseRun, headRef: 'feat/foo', testPrFileCount: 0 });
+    expect(out).toContain('<!-- openreview: skip -->');
+  });
 });

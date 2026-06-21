@@ -1,3 +1,5 @@
+import { OPENREVIEW_SKIP_MARKER } from '../../github/stacked-test-pr.js';
+
 import type { PrRun } from './types.js';
 
 /**
@@ -101,6 +103,7 @@ export function buildTestPRBody(input: SummaryInput & { headRef: string }): stri
     '',
     '> Merge this PR *into the feature branch* (not into the default branch).',
     '',
+    `<!-- ${OPENREVIEW_SKIP_MARKER} -->`,
     '<!-- openreview:coverage:test-pr -->',
   );
   return lines.join('\n');
