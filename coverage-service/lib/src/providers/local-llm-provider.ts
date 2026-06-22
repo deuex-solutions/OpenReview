@@ -4,6 +4,10 @@ import type { GeneratedTest, TestGenerationContext } from '../types';
 
 import type { TestGenerationProvider } from './test-generation-provider';
 
+function outputPathFor(context: TestGenerationContext): string {
+  return context.testOutputPath ?? inferTestFilePath(context.file, context.framework);
+}
+
 export interface LocalLLMProviderConfig {
   baseUrl?: string;
   model?: string;
@@ -41,7 +45,7 @@ export class LocalLLMProvider implements TestGenerationProvider {
       .trim();
 
     return {
-      filePath: inferTestFilePath(context.file, context.framework),
+      filePath: outputPathFor(context),
       content,
       targetFile: context.file,
     };

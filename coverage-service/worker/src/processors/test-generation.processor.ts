@@ -19,6 +19,7 @@ import {
   pickTargetFileForTestGeneration,
   getTestThresholdPercent,
   pathsMatch,
+  prepareTestFileContext,
 } from '@openreview/coverage-lib';
 import type { Job } from 'bullmq';
 
@@ -472,17 +473,12 @@ export class TestGenerationProcessor {
     );
     const exportedSymbols = extractExportedSymbols(source, params.filePath);
 
-    const existingTestPaths = await this.repoProvider.findExistingTests(
+    const testFile = await prepareTestFileContext(
+      this.repoProvider,
       params.runDir,
       params.filePath,
+      framework,
     );
-    const existingTests = (
-      await Promise.all(
-        existingTestPaths.map((p) =>
-          this.repoProvider.getFileContent(params.runDir, p),
-        ),
-      )
-    ).join('\n\n---\n\n');
 
     return this.llmProvider.generateTests({
       language,
@@ -490,13 +486,15 @@ export class TestGenerationProcessor {
       file: params.filePath,
       diff,
       source,
-      existingTests,
+      existingTests: testFile.existingTests,
       uncoveredLines: uncoveredForFile.join(', ') || 'unknown',
       symbols,
       repoPackages: params.repoPackages,
       useFullSource: true,
       fileDiffCoverage: fileCoverageEntry?.diffCoveragePercent ?? null,
       exportedSymbols,
+      testOutputPath: testFile.testOutputPath,
+      isUpdatingExistingTest: testFile.isUpdatingExistingTest,
     });
   }
 

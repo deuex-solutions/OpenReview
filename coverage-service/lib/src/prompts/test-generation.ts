@@ -1,4 +1,4 @@
-import { inferJavaScriptTestFilePath, inferSourceImportPath, sourceFileExtension } from '../test-paths';
+import { inferJavaScriptTestFilePath, inferSourceImportPath, inferTestFilePath, sourceFileExtension } from '../test-paths';
 import type { TestGenerationContext } from '../types';
 
 function formatRepoPackages(packages: string[]): string {
@@ -28,12 +28,43 @@ function formatExportedSymbols(ctx: TestGenerationContext): string {
   return ctx.exportedSymbols.map((s) => `- ${s}`).join('\n');
 }
 
+function outputTestPath(ctx: TestGenerationContext): string {
+  return ctx.testOutputPath ?? inferTestFilePath(ctx.file, ctx.framework);
+}
+
+function formatTestCountGuidance(ctx: TestGenerationContext): string {
+  const exports = ctx.exportedSymbols ?? [];
+  if (exports.length > 4) {
+    return `- Write focused tests covering **each exported symbol** (${exports.length} total: ${exports.join(', ')}). At least one test per symbol, especially for uncovered lines.`;
+  }
+  if (exports.length > 0) {
+    return `- Write 2–${Math.max(4, exports.length)} focused tests covering exported symbols (${exports.join(', ')}). At least one behavior per symbol when uncovered.`;
+  }
+  return '- Write 2–4 short, focused tests. One behavior per test.';
+}
+
+function formatTestOutputMode(ctx: TestGenerationContext): string {
+  const path = outputTestPath(ctx);
+  const countGuidance = formatTestCountGuidance(ctx);
+  if (ctx.isUpdatingExistingTest) {
+    return `## Mode: UPDATE existing test file
+- Output path: \`${path}\` (this file already exists — do NOT create a new file elsewhere).
+- Keep all existing tests that still apply; do not remove or rewrite passing tests unnecessarily.
+${countGuidance}
+- Do not duplicate test names or behaviors already present in Existing Tests.
+- Return the **complete updated test file** (existing + new tests).`;
+  }
+  return `## Mode: CREATE new test file
+- Output path: \`${path}\`
+${countGuidance}`;
+}
+
 function buildPythonPrompt(ctx: TestGenerationContext, symbols: string): string {
   return `You are writing Python unit tests for ONE production file. Tests must pass on first run with no manual fixes.
 
 ## Scope
 - Generate ONLY the complete test file content. No markdown, no explanations, no extra files unless required for imports to work.
-- Write 2–4 short, focused tests. One behavior per test.
+${formatTestOutputMode(ctx)}
 - Test the file: ${ctx.file}
 
 ${formatFullSourceHeader(ctx)}## Context
@@ -134,7 +165,7 @@ Return only the complete test file.`;
 }
 
 function buildJavaScriptPrompt(ctx: TestGenerationContext, symbols: string): string {
-  const testFile = inferJavaScriptTestFilePath(ctx.file);
+  const testFile = outputTestPath(ctx);
   const importPath = inferSourceImportPath(testFile, ctx.file);
   const importExt = sourceFileExtension(ctx.file);
   const repoHasJest = ctx.repoPackages.some((p) => normalizePackageName(p) === 'jest');
@@ -156,9 +187,8 @@ Do NOT use @jest/globals, jest, vitest, or mocha unless they appear in Repositor
 
 ## Scope
 - Generate ONLY the complete test file content. No markdown, no explanations.
-- Write 2–4 short, focused tests. One behavior per test.
+${formatTestOutputMode(ctx)}
 - Production file: ${ctx.file}
-- Save tests to: ${testFile}
 
 ${formatFullSourceHeader(ctx)}## Context
 
@@ -290,6 +320,7 @@ export function buildTestGenerationSystemPrompt(language: string): string {
     return (
       'You write simple, correct JavaScript unit tests that pass on first run. ' +
       'Prefer node:test and node:assert unless the repo already uses Jest/Vitest. ' +
+      'When updating an existing test file, preserve working tests and append new cases for uncovered lines. ' +
       'Use correct relative ESM import paths with the source file extension (.js, .jsx, .ts, .tsx). ' +
       'Only import symbols listed as exported; never import private functions. ' +
       'For CLI files with no exports, test via child_process.spawnSync instead of importing. ' +
@@ -300,6 +331,7 @@ export function buildTestGenerationSystemPrompt(language: string): string {
 
   return (
     'You write simple, correct unit tests that pass on first run. Mock all external I/O. ' +
+    'When updating an existing test file, preserve working tests and append new cases for uncovered lines. ' +
     'Use exact types and defaults from source models. Return only runnable test file code. ' +
     'Declare minimal extra test-only packages on the first line as # test-deps: pkg1, pkg2'
   );
