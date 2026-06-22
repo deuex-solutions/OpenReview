@@ -150,17 +150,32 @@ export async function processCoverageAnalysis(
   let testPrUrl: string | null = null;
   let testPrFileCount = 0;
 
-  if (run.status === 'COMPLETED' && run.generatedTestFiles.length > 0) {
-    const { url, count } = await openStackedTestPR({
-      job,
-      run,
-      client,
-      cfg: deps.cfg,
-      log,
-      prAuthorFactory: deps.prAuthorFactory,
-    });
-    testPrUrl = url;
-    testPrFileCount = count;
+  if (run.status === 'COMPLETED') {
+    const passingFiles = run.generatedTestFiles.filter(
+      (t) => t.passed === true && t.fileContent.length > 0,
+    );
+
+    if (passingFiles.length > 0) {
+      const { url, count } = await openStackedTestPR({
+        job,
+        run,
+        files: passingFiles,
+        client,
+        cfg: deps.cfg,
+        log,
+        prAuthorFactory: deps.prAuthorFactory,
+      });
+      testPrUrl = url;
+      testPrFileCount = count;
+    } else if (run.generatedTestFiles.length > 0) {
+      log.warn(
+        {
+          generated: run.generatedTestFiles.length,
+          passed: 0,
+        },
+        'generated tests did not pass validation; skipping stacked PR',
+      );
+    }
   }
 
   // ------------------------------------------------------------------ //
@@ -187,6 +202,7 @@ export async function processCoverageAnalysis(
 async function openStackedTestPR(args: {
   job: CoverageAnalysisJob;
   run: PrRun;
+  files: PrRun['generatedTestFiles'];
   client: GitHubClient;
   cfg: ServiceConfig;
   log: Logger;
@@ -194,9 +210,10 @@ async function openStackedTestPR(args: {
 }): Promise<{ url: string | null; count: number }> {
   const { job, run, client, cfg, log } = args;
 
-  const files = run.generatedTestFiles
-    .filter((t) => t.fileContent.length > 0)
-    .map((t) => ({ path: t.filePath, content: t.fileContent }));
+  const files = args.files.map((t) => ({
+    path: t.filePath,
+    content: t.fileContent,
+  }));
 
   if (files.length === 0) {
     log.warn('coverage service reported tests with empty content; skipping PR');
