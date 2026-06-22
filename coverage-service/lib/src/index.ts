@@ -14,6 +14,7 @@ export * from './providers/anthropic-provider';
 export * from './providers/local-llm-provider';
 export * from './prompts/test-generation';
 export * from './test-paths';
+export * from './prepare-test-generation';
 export * from './analysis/code-analyzer';
 
 import { AnthropicProvider } from './providers/anthropic-provider';

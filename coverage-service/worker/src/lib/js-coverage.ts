@@ -181,6 +181,9 @@ function walkJsTestFiles(dir: string, repoDir: string, results: string[]): void 
 function guessTestFileNames(sourcePath: string): string[] {
   const normalized = normalizePath(sourcePath);
   const baseName = normalized.split('/').pop()?.replace(/\.[^.]+$/, '') ?? '';
+  const dir = normalized.includes('/')
+    ? normalized.replace(/\/[^/]+$/, '')
+    : '';
   const dirPart = normalized.includes('/')
     ? normalized.replace(/\.[^.]+$/, '').replace(/\//g, '_')
     : baseName;
@@ -192,6 +195,12 @@ function guessTestFileNames(sourcePath: string): string[] {
   return [
     `${underTests}.test${ext}`,
     `${underTests}.spec${ext}`,
+    ...(dir
+      ? [
+          `${dir}/__test__/${baseName}.test${ext}`,
+          `${dir}/__tests__/${baseName}.test${ext}`,
+        ]
+      : []),
     `${baseName}.test${ext}`,
     `${baseName}.spec${ext}`,
     `test_${baseName}${ext}`,
@@ -231,9 +240,18 @@ export async function collectJsTestPaths(
   }
 
   for (const sourcePath of sourcePaths) {
-    const existing = await repoProvider.findExistingTests(repoDir, sourcePath);
-    for (const absPath of existing) {
-      testPaths.add(normalizePath(relative(repoDir, absPath)));
+    const existing = await repoProvider.findExistingTests(
+      repoDir,
+      sourcePath,
+      'node:test',
+    );
+    for (const testPath of existing) {
+      const rel = normalizePath(
+        testPath.startsWith(repoDir)
+          ? relative(repoDir, testPath)
+          : testPath,
+      );
+      testPaths.add(rel);
     }
 
     for (const candidate of guessTestFileNames(sourcePath)) {

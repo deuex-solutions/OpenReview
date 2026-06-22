@@ -4,6 +4,10 @@ import type { GeneratedTest, TestGenerationContext } from '../types';
 
 import type { TestGenerationProvider } from './test-generation-provider';
 
+function outputPathFor(context: TestGenerationContext): string {
+  return context.testOutputPath ?? inferTestFilePath(context.file, context.framework);
+}
+
 export interface AnthropicProviderConfig {
   apiKey: string;
   model?: string;
@@ -43,7 +47,7 @@ export class AnthropicProvider implements TestGenerationProvider {
     const content = raw.replace(/^```[\w]*\n?/gm, '').replace(/```$/gm, '').trim();
 
     return {
-      filePath: inferTestFilePath(context.file, context.framework),
+      filePath: outputPathFor(context),
       content,
       targetFile: context.file,
     };

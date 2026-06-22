@@ -25,5 +25,9 @@ export interface RepositoryProvider {
     headBranch: string,
   ): Promise<ChangedFile[]>;
   getFileContent(repoDir: string, filePath: string): Promise<string>;
-  findExistingTests(repoDir: string, sourceFile: string): Promise<string[]>;
+  findExistingTests(
+    repoDir: string,
+    sourceFile: string,
+    framework?: string,
+  ): Promise<string[]>;
 }

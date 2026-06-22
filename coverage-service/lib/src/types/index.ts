@@ -120,6 +120,10 @@ export interface TestGenerationContext {
   failureLogs?: string;
   previousTestContent?: string;
   attemptNumber?: number;
+  /** Repo-relative path where the generated test file will be written. */
+  testOutputPath?: string;
+  /** True when updating an existing test file instead of creating a new one. */
+  isUpdatingExistingTest?: boolean;
 }
 
 export interface PrAnalysisJobData {

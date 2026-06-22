@@ -27,6 +27,7 @@ import {
   selectFilesForGeneration,
   classifyCoverageBlockers,
   buildWorkflowSummary,
+  prepareTestFileContext,
 } from '@openreview/coverage-lib';
 import type { Prisma } from '@prisma/client';
 import type { Job } from 'bullmq';
@@ -395,6 +396,21 @@ export class PrAnalysisProcessor {
             `Generating tests for ${file.path} (diff coverage ${fileDiff ?? 'n/a'}%, full PR branch source)`,
           );
           try {
+            const framework = detectFramework(runDir, detectLanguage(file.path), testCommand);
+            const testCtx = await prepareTestFileContext(
+              this.repoProvider,
+              runDir,
+              file.path,
+              framework,
+            );
+            if (testCtx.isUpdatingExistingTest) {
+              await this.log(
+                data.prRunId,
+                'info',
+                `Updating existing test file: ${testCtx.testOutputPath}`,
+              );
+            }
+
             const outcome = await this.generateAndValidateTest({
               prRunId: data.prRunId,
               runDir,
@@ -510,11 +526,17 @@ export class PrAnalysisProcessor {
           'Recalculating coverage after generated tests',
         );
 
+        // Run only generated tests for post-coverage — pre-existing broken tests
+        // (e.g. src/**/__test__ with bad ESM imports) must not fail the recalc.
         const postTestPaths = useCoveragePackageOnly
-          ? [...new Set([...pythonTestPaths, ...generatedTestPaths])]
+          ? generatedTestPaths.length > 0
+            ? generatedTestPaths
+            : pythonTestPaths
           : useAutoJsCoverage
-            ? [...new Set([...jsTestPaths, ...generatedTestPaths])]
-            : [];
+            ? generatedTestPaths.length > 0
+              ? generatedTestPaths
+              : jsTestPaths
+            : generatedTestPaths;
         const postCoverageCommand = useCoveragePackageOnly
           ? repoSetup.wrapCommand(
               buildPythonCoverageCommand(sourcePaths, postTestPaths, runDir),
@@ -1091,15 +1113,12 @@ export class PrAnalysisProcessor {
     const symbols = await analyzer.extractSymbols(source, filePath, []);
     const exportedSymbols = extractExportedSymbols(source, filePath);
 
-    const existingTestPaths = await this.repoProvider.findExistingTests(
+    const testFile = await prepareTestFileContext(
+      this.repoProvider,
       repoDir,
       filePath,
+      framework,
     );
-    const existingTests = (
-      await Promise.all(
-        existingTestPaths.map((p) => this.repoProvider.getFileContent(repoDir, p)),
-      )
-    ).join('\n\n---\n\n');
 
     return this.llmProvider.generateTests({
       language,
@@ -1107,7 +1126,7 @@ export class PrAnalysisProcessor {
       file: filePath,
       diff,
       source,
-      existingTests,
+      existingTests: testFile.existingTests,
       uncoveredLines: uncoveredForFile.join(', ') || 'unknown',
       symbols,
       repoPackages,
@@ -1117,6 +1136,8 @@ export class PrAnalysisProcessor {
       failureLogs: repair?.failureLogs,
       previousTestContent: repair?.previousTestContent,
       attemptNumber: repair?.attemptNumber,
+      testOutputPath: testFile.testOutputPath,
+      isUpdatingExistingTest: testFile.isUpdatingExistingTest,
     });
   }
 

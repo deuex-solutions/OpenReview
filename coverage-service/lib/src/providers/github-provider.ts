@@ -7,6 +7,7 @@ import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 
 import type { ChangedFile } from '../types';
+import { orderedTestFileCandidates } from '../test-paths';
 
 import type {
   CheckoutPROptions,
@@ -261,59 +262,55 @@ export class GitHubProvider implements RepositoryProvider {
   async findExistingTests(
     repoDir: string,
     sourceFile: string,
+    framework = 'pytest',
   ): Promise<string[]> {
     const { readdir } = await import('fs/promises');
-    const baseName = sourceFile.replace(/\.[^.]+$/, '');
-    const dir = join(repoDir, sourceFile.split('/').slice(0, -1).join('/'));
-    const patterns = [
-      `${baseName}.test.ts`,
-      `${baseName}.spec.ts`,
-      `${baseName}.test.js`,
-      `${baseName}.spec.js`,
-      `test_${baseName.split('/').pop()}.py`,
-    ];
 
-    const results: string[] = [];
-    for (const pattern of patterns) {
-      const full = join(dir, pattern.split('/').pop()!);
-      if (existsSync(full)) results.push(full);
-    }
+    const found = new Set<string>();
+    const add = (rel: string) => found.add(rel.replace(/\\/g, '/'));
 
-    try {
-      const entries = await readdir(join(repoDir, 'test'), { recursive: true });
-      for (const entry of entries) {
-        const name = String(entry);
-        if (
-          name.includes(baseName.split('/').pop()!) &&
-          (name.endsWith('.test.ts') ||
-            name.endsWith('.spec.ts') ||
-            name.startsWith('test_'))
-        ) {
-          results.push(join(repoDir, 'test', name));
-        }
+    for (const candidate of orderedTestFileCandidates(sourceFile, framework)) {
+      const full = join(repoDir, candidate);
+      if (existsSync(full)) {
+        add(candidate);
       }
-    } catch {
-      // no test directory
     }
 
-    try {
-      const entries = await readdir(join(repoDir, 'tests'), { recursive: true });
-      for (const entry of entries) {
-        const name = String(entry);
-        if (
-          name.includes(baseName.split('/').pop()!) &&
-          (name.endsWith('.test.ts') ||
-            name.endsWith('.spec.ts') ||
-            name.startsWith('test_'))
-        ) {
-          results.push(join(repoDir, 'tests', name));
+    const baseName = sourceFile.split('/').pop()!.replace(/\.[^.]+$/, '');
+
+    for (const testRoot of ['tests', 'test', 'src'] as const) {
+      try {
+        const entries = await readdir(join(repoDir, testRoot), {
+          recursive: true,
+        });
+        for (const entry of entries) {
+          const name = String(entry);
+          if (
+            !name.includes(baseName) ||
+            !(
+              name.endsWith('.test.ts') ||
+              name.endsWith('.test.tsx') ||
+              name.endsWith('.test.js') ||
+              name.endsWith('.test.jsx') ||
+              name.endsWith('.spec.ts') ||
+              name.endsWith('.spec.js') ||
+              name.startsWith('test_')
+            )
+          ) {
+            continue;
+          }
+          const rel = `${testRoot}/${name}`.replace(/\\/g, '/');
+          const full = join(repoDir, rel);
+          if (existsSync(full)) {
+            add(rel);
+          }
         }
+      } catch {
+        // no directory
       }
-    } catch {
-      // no tests directory
     }
 
-    return results;
+    return [...found];
   }
 
   private async runGit(args: string[], cwd?: string): Promise<void> {

@@ -7,6 +7,10 @@ import type { GeneratedTest, TestGenerationContext } from '../types';
 
 import type { TestGenerationProvider } from './test-generation-provider';
 
+function outputPathFor(context: TestGenerationContext): string {
+  return context.testOutputPath ?? inferTestFilePath(context.file, context.framework);
+}
+
 export interface OpenAIProviderConfig {
   apiKey: string;
   model?: string;
@@ -50,7 +54,7 @@ export class OpenAIProvider implements TestGenerationProvider {
     const content = this.stripMarkdown(data.choices[0]?.message?.content ?? '');
 
     return {
-      filePath: inferTestFilePath(context.file, context.framework),
+      filePath: outputPathFor(context),
       content,
       targetFile: context.file,
     };
