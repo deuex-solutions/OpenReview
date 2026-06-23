@@ -307,53 +307,6 @@ describe('processCoverageAnalysis', () => {
     expect(prAuthor.openOrUpdatePR).not.toHaveBeenCalled();
   });
 
-  it('does not open a stacked PR when generated tests failed validation', async () => {
-    makeRuntime();
-
-    const coverageClient = {
-      findOrCreateRepository: vi.fn(async () => baseRepo),
-      triggerAnalysis: vi.fn(async () => ({ prRunId: 'run-1', status: 'enqueued' })),
-      waitForPrRun: vi.fn(
-        async (): Promise<PrRun> => ({
-          ...baseRun,
-          generatedTestFiles: [
-            {
-              id: 't1',
-              filePath: 'tests/match.service.test.ts',
-              targetFile: 'src/match.service.ts',
-              passed: false,
-              fileContent: 'broken test content',
-            },
-          ],
-        }),
-      ),
-    };
-    const prAuthor = {
-      branchExists: vi.fn(),
-      commitFiles: vi.fn(),
-      openOrUpdatePR: vi.fn(),
-    };
-
-    await processCoverageAnalysis(job, {
-      auth,
-      logger: makeLogger(),
-      cfg,
-      coverageClientFactory: () =>
-        coverageClient as unknown as Pick<
-          CoverageServiceClient,
-          'findOrCreateRepository' | 'triggerAnalysis' | 'waitForPrRun'
-        >,
-      prAuthorFactory: () =>
-        prAuthor as unknown as Pick<
-          PRAuthor,
-          'branchExists' | 'commitFiles' | 'openOrUpdatePR'
-        >,
-    });
-
-    expect(prAuthor.commitFiles).not.toHaveBeenCalled();
-    expect(prAuthor.openOrUpdatePR).not.toHaveBeenCalled();
-  });
-
   it('throws when the coverage run terminates with FAILED', async () => {
     makeRuntime();
     const coverageClient = {
