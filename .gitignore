@@ -7,6 +7,10 @@ dist/
 # Environment
 .env
 .env.local
+deployment/coverage-api.env
+deployment/coverage-worker.env
+deployment/openreview-api.env
+deployment/openreview-worker.env
 
 # Trace files
 *.json.trace

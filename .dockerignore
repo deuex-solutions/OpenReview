@@ -1,0 +1,26 @@
+# Dependencies and build output
+**/node_modules
+**/dist
+**/.venv-tools
+
+# Environment and secrets
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Git and editor
+.git
+.gitignore
+**/.DS_Store
+**/*.log
+
+# Test coverage report output (do not use **/coverage — it excludes source under
+# service/src/dispatch/coverage and coverage-service/lib/src/coverage)
+/coverage
+**/.vitest
+
+# Docker (avoid recursive context)
+deployment/coverage-api.env
+deployment/coverage-worker.env
+deployment/openreview-api.env
+deployment/openreview-worker.env

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # -----------------------------------------------------------------------------
-# Builder — installs all workspace deps and produces dist/ for service + deps
+# Builder — installs workspace deps and produces dist/ for service + core
 # -----------------------------------------------------------------------------
 FROM node:24-alpine AS builder
 
@@ -12,8 +12,6 @@ WORKDIR /app
 # Workspace manifests first for better layer caching.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json tsconfig.base.json ./
 COPY core/package.json core/
-COPY cli/package.json cli/
-COPY action/package.json action/
 COPY service/package.json service/
 
 RUN pnpm install --frozen-lockfile --filter @openreview/service... --filter @openreview/core
@@ -24,14 +22,14 @@ COPY service ./service
 RUN pnpm -r --filter @openreview/core --filter @openreview/service build
 
 # Prune dev dependencies for the runtime image.
-RUN pnpm --filter @openreview/service --prod deploy /out
+RUN pnpm --filter @openreview/service --prod deploy /out --legacy
 
-# -----------------------------------------------------------------------------
 # Runtime — slim Node image with only the service + its prod deps
-# -----------------------------------------------------------------------------
+
 FROM node:24-alpine AS runtime
 
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 
 WORKDIR /app
 

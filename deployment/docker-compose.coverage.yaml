@@ -1,3 +1,5 @@
+name: coverage
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,7 +8,7 @@ services:
       POSTGRES_PASSWORD: prcoverage
       POSTGRES_DB: prcoverage
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - '6379:6379'
+      - '6381:6379'
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -27,38 +29,40 @@ services:
 
   api:
     build:
-      context: ../..
-      dockerfile: coverage-service/api/Dockerfile
+      context: ..
+      dockerfile: deployment/coverage-api/Dockerfile
     ports:
-      - '3000:3000'
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://prcoverage:prcoverage@postgres:5432/prcoverage?schema=public
-      REDIS_URL: redis://redis:6379
-      API_PORT: 3000
+      - '3010:3000'
+    env_file: coverage-api.env
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   worker:
     build:
-      context: ../..
-      dockerfile: coverage-service/worker/Dockerfile
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://prcoverage:prcoverage@postgres:5432/prcoverage?schema=public
-      REDIS_URL: redis://redis:6379
-      WORK_DIR: /tmp/pr-coverage-runs
+      context: ..
+      dockerfile: deployment/coverage-worker/Dockerfile
+    env_file: coverage-worker.env
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       api:
-        condition: service_started
+        condition: service_healthy
     deploy:
       resources:
         limits:
