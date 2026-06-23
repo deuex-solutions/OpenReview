@@ -182,18 +182,6 @@ Do NOT use @jest/globals, jest, vitest, or mocha unless they appear in Repositor
       : 'Use Jest APIs matching existing tests in the repo.';
 
   const hasExports = (ctx.exportedSymbols?.length ?? 0) > 0;
-  const isTypeScript = ctx.language === 'typescript';
-
-  const typeScriptSection = isTypeScript
-    ? `
-## TypeScript (critical)
-- NEVER read \`.ts\` source with fs.readFileSync and eval/new Function — TypeScript syntax fails at runtime.
-- Use the repo test runner from Repository Packages (vitest, jest, etc.) with normal imports of the module under test.
-- Mock all external I/O: database (Sequelize/db), Redis, HTTP, filesystem, dynamic import() side effects.
-- Prefer testing pure exported functions with vi.mock/jest.mock for dependencies — match patterns in Existing Tests.
-- Do not import paths that only exist after compilation unless the repo already uses tsx/ts-jest that way.
-`
-    : '';
 
   return `You are writing JavaScript unit tests for ONE production file. Tests must pass on first run with no manual fixes.
 
@@ -227,7 +215,6 @@ ${ctx.uncoveredLines}
 
 All Symbols in File:
 ${symbols || '(none detected)'}
-${typeScriptSection}
 
 ## Test runner
 ${frameworkSection}
@@ -295,7 +282,7 @@ function buildRepairSection(ctx: TestGenerationContext): string {
   return `
 
 ## Repair (attempt ${ctx.attemptNumber ?? 2})
-The previous generated test failed when executed. **Fix the test file so it compiles, runs, and passes** — failed tests are never included in the PR.
+The previous generated test failed when executed. Fix the test file so it compiles, runs, and passes.
 
 Failure output:
 ${ctx.failureLogs}
@@ -307,7 +294,6 @@ Requirements:
 - Fix syntax, import paths, mocks, and assertions only — do not change production code.
 - Reuse existing fixtures/mocks from Existing Tests when possible.
 - Do not add new npm/pip dependencies unless declared via test-deps header.
-- For TypeScript: never use fs.readFileSync + new Function on .ts source; use proper imports and mocks.
 - Return the complete corrected test file only.`;
 }
 
