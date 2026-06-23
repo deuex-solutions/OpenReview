@@ -866,6 +866,7 @@ export class PrAnalysisProcessor {
       params.declaredTestDeps,
       params.repoPackages,
       ecosystem,
+      params.generatedTests.flatMap((t) => [t.filePath, t.targetFile]),
     );
     const extraInstall = params.repoSetup.isJavaScript
       ? buildNpmInstallCommand(testRunDeps)

@@ -168,20 +168,36 @@ function buildJavaScriptPrompt(ctx: TestGenerationContext, symbols: string): str
   const testFile = outputTestPath(ctx);
   const importPath = inferSourceImportPath(testFile, ctx.file);
   const importExt = sourceFileExtension(ctx.file);
-  const repoHasJest = ctx.repoPackages.some((p) => normalizePackageName(p) === 'jest');
-  const repoHasVitest = ctx.repoPackages.some((p) => normalizePackageName(p) === 'vitest');
-  const useNodeTest = !repoHasJest && !repoHasVitest;
-
-  const frameworkSection = useNodeTest
-    ? `Use Node.js built-in test runner ONLY:
+  const frameworkSection = `Use Node.js built-in test runner ONLY:
   import test from 'node:test';
   import assert from 'node:assert/strict';
-Do NOT use @jest/globals, jest, vitest, or mocha unless they appear in Repository Packages.`
-    : ctx.framework.includes('vitest')
-      ? 'Use Vitest APIs matching existing tests in the repo.'
-      : 'Use Jest APIs matching existing tests in the repo.';
+Do NOT use @jest/globals, jest, vitest, mocha, describe, it, expect, or jest.fn. The validation command is node --test.`;
 
   const hasExports = (ctx.exportedSymbols?.length ?? 0) > 0;
+  const isReactSource = /\.(jsx|tsx)$/i.test(ctx.file);
+  const reactSection =
+    isReactSource
+      ? `## React / JSX (mandatory for ${ctx.file})
+- Prefer simple tests that do NOT render the component. First test exported helpers, constants, style objects, prop-building functions, module exports, or callback behavior that can be called directly.
+- For complex Next/MUI/browser components, a smoke test that imports the module and asserts exported symbols are functions/objects is better than a brittle render test.
+- Avoid @testing-library/react and jsdom unless the target behavior cannot be tested through pure/static exports.
+- If you truly must render, node:test has no JSDOM — set up jsdom before any import that uses the DOM:
+    import { JSDOM } from 'jsdom';
+    const { window } = new JSDOM('<!DOCTYPE html><html><body></body></html>', { url: 'http://localhost' });
+    globalThis.window = window;
+    globalThis.document = window.document;
+    Object.defineProperty(globalThis, 'navigator', { value: window.navigator, configurable: true });
+    globalThis.HTMLElement = window.HTMLElement;
+    globalThis.Node = window.Node;
+- Place jsdom setup immediately after the test-deps line and before all other imports.
+- Use @testing-library/react only if it appears in Repository Packages and the component has simple dependencies; otherwise use pure/static assertions.
+- Mock firebase, routers, fetch, and service modules — never call real backends.
+- Avoid module mocking when possible. Do not import modules that require Next runtime, auth providers, real stores, CSS-heavy widgets, or localStorage unless the test sets up those globals.
+- For rendered text, use flexible matchers (getByText(/Team:\\s*-/) or regex) — JSX whitespace varies; never assert exact strings with ambiguous spacing.
+- Wrap state updates in act() from 'react' when needed.
+
+`
+      : '';
 
   return `You are writing JavaScript unit tests for ONE production file. Tests must pass on first run with no manual fixes.
 
@@ -219,7 +235,7 @@ ${symbols || '(none detected)'}
 ## Test runner
 ${frameworkSection}
 
-## Imports (critical)
+${reactSection}## Imports (critical)
 ${hasExports
     ? `- Import ONLY from exported symbols listed above via: '${importPath}'
 - Always include the ${importExt} extension in relative ESM imports.
@@ -243,13 +259,15 @@ Example layout (exported module):
   import { loadConfig } from '../../src/config/loadConfig.js';
 
 ## What to test
-1. Pure functions: validators, branching, error cases, defaults.
-2. Exported classes/methods with stubbed dependencies.
-3. CLI/entry-point files (no exports): subprocess tests with mocked env and stubbed child processes.
+1. Pure/static logic first: validators, formatters, constants, style object keys/values, enum/type runtime exports, barrel re-exports.
+2. Exported classes/methods with plain object fakes.
+3. React/Next files: prefer import/export smoke tests and direct helper tests over rendering.
+4. CLI/entry-point files (no exports): subprocess tests with mocked env and stubbed child processes.
 
 ## Mocking (mandatory for I/O)
 - Never call real network, filesystem, databases, or external services.
 - Stub fetch, fs, and SDK clients with plain objects or node:test mock.method when available.
+- Do NOT use mock.module or test.mock.module; this Node runtime does not support it. Prefer testing exported pure helpers, passing props/callback fakes, or mocking globals like fetch/localStorage directly.
 - For MCP/HTTP clients, mock at the boundary the production code uses.
 
 ## ESM
@@ -259,21 +277,17 @@ Example layout (exported module):
 ## Test deps header (only if needed)
 If tests need npm packages NOT in Repository Packages, first line:
   // test-deps: package-name
-Examples: sinon, nock. Do NOT list jest if using node:test.
+Examples: sinon, nock. Avoid new packages. Do NOT list jest, vitest, @testing-library/react, or jsdom unless absolutely required and absent from Repository Packages.
 Never list Node built-ins (node:test, node:assert, node:fs, fs, path, etc.) — they are not npm packages.
 
 ## Self-check before returning
-- [ ] 2–4 tests using ${useNodeTest ? 'node:test + node:assert' : ctx.framework}
+- [ ] 2–4 tests using node:test + node:assert
 - [ ] Import path is '${importPath}' (or equivalent correct relative path)
 - [ ] Every imported symbol exists in source exports
 - [ ] All external I/O mocked
 - [ ] Would pass: node --test ${testFile} from repo root
 
 Return only the complete test file.`;
-}
-
-function normalizePackageName(name: string): string {
-  return name.trim().toLowerCase().replace(/\[.*\]/, '').split(/[<>=!;]/)[0].trim();
 }
 
 function buildRepairSection(ctx: TestGenerationContext): string {
@@ -294,6 +308,12 @@ Requirements:
 - Fix syntax, import paths, mocks, and assertions only — do not change production code.
 - Reuse existing fixtures/mocks from Existing Tests when possible.
 - Do not add new npm/pip dependencies unless declared via test-deps header.
+- Prefer simplifying the test over adding mocks: replace brittle render tests with pure/static assertions, exported helper tests, or import/export smoke tests.
+- If failure is "document is not defined", add jsdom setup before all other imports (see React / JSX section).
+- If failure mentions localStorage or "opaque origins", create JSDOM with { url: 'http://localhost' } and stub globalThis.localStorage, or avoid rendering/importing the browser-dependent path.
+- If failure mentions ".css" unknown extension, avoid importing the CSS-heavy component path unless necessary; prefer testing a pure export or style/helper module.
+- If failure says "mock.module is not a function" or "test.mock.module is not a function", remove module mocking and test via exported helpers, props, callback fakes, or globals instead.
+- If TestingLibraryElementError mentions whitespace/normalization, use regex matchers (e.g. getByText(/Team:\\s*-/)) instead of exact strings.
 - Return the complete corrected test file only.`;
 }
 
@@ -324,7 +344,8 @@ export function buildTestGenerationSystemPrompt(language: string): string {
       'Use correct relative ESM import paths with the source file extension (.js, .jsx, .ts, .tsx). ' +
       'Only import symbols listed as exported; never import private functions. ' +
       'For CLI files with no exports, test via child_process.spawnSync instead of importing. ' +
-      'Mock all external I/O. Return only runnable test file code. ' +
+      'Mock all external I/O. Prefer pure/static assertions and import/export smoke tests over rendering React components. Return only runnable test file code. ' +
+      'For React/JSX files with node:test, avoid jsdom/rendering unless needed; if rendering, set up jsdom before DOM imports and use flexible text matchers. ' +
       'Declare extra npm packages on the first line as // test-deps: pkg1, pkg2'
     );
   }

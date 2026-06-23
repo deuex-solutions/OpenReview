@@ -204,10 +204,54 @@ export interface ParsedGeneratedTest {
 }
 
 /** Strip optional LLM-declared test deps and return cleaned test content. */
+const JSDOM_SETUP = `import { JSDOM } from 'jsdom';
+
+const { window } = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+  url: 'http://localhost',
+});
+globalThis.window = window;
+globalThis.document = window.document;
+Object.defineProperty(globalThis, 'navigator', {
+  value: window.navigator,
+  configurable: true,
+});
+globalThis.HTMLElement = window.HTMLElement;
+globalThis.Node = window.Node;
+`;
+
+export function needsJsdomEnvironment(content: string): boolean {
+  return (
+    /@testing-library\/react/.test(content) ||
+    /\bfrom\s+['"]react-dom\/test-utils['"]/.test(content) ||
+    (/\brender\s*\(/.test(content) && /\bfrom\s+['"]react['"]/.test(content))
+  );
+}
+
+function hasJsdomSetup(content: string): boolean {
+  return (
+    /\bfrom\s+['"]jsdom['"]/.test(content) ||
+    /globalThis\.document\s*=/.test(content) ||
+    /global\.document\s*=/.test(content)
+  );
+}
+
+/** Inject jsdom globals before imports when React DOM tests omit setup. */
+export function prepareGeneratedJsTestContent(content: string): string {
+  if (!needsJsdomEnvironment(content) || hasJsdomSetup(content)) {
+    return content;
+  }
+
+  const depsMatch = content.match(/^\s*\/\/\s*test-deps:\s*.+\s*\n/);
+  const depsHeader = depsMatch?.[0] ?? '';
+  const rest = depsMatch ? content.slice(depsMatch[0].length) : content;
+
+  return `${depsHeader}${JSDOM_SETUP}\n${rest}`;
+}
+
 export function parseGeneratedTestContent(content: string): ParsedGeneratedTest {
   const match = content.match(/^\s*(?:\/\/|#)\s*test-deps:\s*(.+)\s*$/m);
   if (!match) {
-    return { content: content.trim(), declaredDeps: [] };
+    return { content: prepareGeneratedJsTestContent(content.trim()), declaredDeps: [] };
   }
 
   const declaredDeps = match[1]
@@ -218,7 +262,10 @@ export function parseGeneratedTestContent(content: string): ParsedGeneratedTest 
   const cleaned = content
     .replace(/^\s*(?:\/\/|#)\s*test-deps:\s*.+\s*\n?/m, '')
     .trim();
-  return { content: cleaned, declaredDeps };
+  return {
+    content: prepareGeneratedJsTestContent(cleaned),
+    declaredDeps,
+  };
 }
 
 function extractPythonImports(content: string): string[] {
@@ -245,6 +292,7 @@ function extractJsImportSpecs(content: string): string[] {
 
 function importSpecToNpmPackage(spec: string): string | null {
   if (spec.startsWith('.') || spec.startsWith('/')) return null;
+  if (spec.startsWith('@/') || spec.startsWith('#') || spec.startsWith('~')) return null;
   if (isNonNpmPackage(spec)) return null;
 
   const mapped = JS_IMPORT_TO_PACKAGE[spec];
@@ -303,6 +351,10 @@ function inferJsTestPackages(testContents: string[]): string[] {
     packages.add('sinon');
   }
 
+  if (needsJsdomEnvironment(combined)) {
+    packages.add('jsdom');
+  }
+
   for (const content of testContents) {
     for (const spec of extractJsImportSpecs(content)) {
       const pkg = importSpecToNpmPackage(spec);
@@ -319,18 +371,36 @@ function inferAutoTestPackages(testContents: string[], ecosystem: 'python' | 'ja
     : inferPythonTestPackages(testContents);
 }
 
+/** tsx transpiles .jsx/.tsx/.ts for node --test and dynamic imports. */
+export function needsJsTranspileLoader(paths: string[]): boolean {
+  return paths.some((p) => /\.(jsx|tsx|ts)$/i.test(p.trim()));
+}
+
+function inferJsTranspilePackages(filePaths: string[]): string[] {
+  return needsJsTranspileLoader(filePaths) ? ['tsx'] : [];
+}
+
 export function collectTestRunDependencies(
   testContents: string[],
   declaredDeps: string[],
   repoPackages: string[],
   ecosystem: 'python' | 'javascript' = 'python',
+  filePaths: string[] = [],
 ): string[] {
   const repoNormalized = new Set(
     repoPackages.map((pkg) => normalizePackageName(pkg)),
   );
   const deps = new Set<string>();
 
-  for (const dep of [...declaredDeps, ...inferAutoTestPackages(testContents, ecosystem)]) {
+  const autoDeps =
+    ecosystem === 'javascript'
+      ? [
+          ...inferAutoTestPackages(testContents, ecosystem),
+          ...inferJsTranspilePackages(filePaths),
+        ]
+      : inferAutoTestPackages(testContents, ecosystem);
+
+  for (const dep of [...declaredDeps, ...autoDeps]) {
     if (isNonNpmPackage(dep)) continue;
     const normalized = normalizePackageName(dep);
     if (!normalized || repoNormalized.has(normalized)) continue;
@@ -349,5 +419,5 @@ export function buildPipInstallCommand(packages: string[]): string | null {
 export function buildNpmInstallCommand(packages: string[]): string | null {
   if (packages.length === 0) return null;
   const quoted = packages.map((pkg) => `'${pkg.replace(/'/g, `'"'"'`)}'`);
-  return `npm install -D ${quoted.join(' ')}`;
+  return `npm install --no-save --legacy-peer-deps ${quoted.join(' ')}`;
 }

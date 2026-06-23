@@ -3,6 +3,25 @@ import { join, relative } from 'path';
 
 import { sourceFileExtension, type ChangedFile, type RepositoryProvider } from '@openreview/coverage-lib';
 
+import { needsJsTranspileLoader } from './repo-packages.js';
+
+const TEST_REGISTER_PATH = '.openreview-test-register.cjs';
+const TEST_LOADER_PATH = '.openreview-test-loader.mjs';
+const TEST_REGISTER_CONTENT = `const noop = (module) => { module.exports = {}; };
+for (const ext of ['.css', '.scss', '.sass', '.less', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp']) {
+  require.extensions[ext] = noop;
+}
+`;
+const TEST_LOADER_CONTENT = `const ASSET_EXTENSIONS = /\\.(css|scss|sass|less|svg|png|jpg|jpeg|gif|webp)(\\?.*)?$/;
+
+export async function load(url, context, nextLoad) {
+  if (ASSET_EXTENSIONS.test(url)) {
+    return { format: 'module', source: 'export default {};', shortCircuit: true };
+  }
+  return nextLoad(url, context);
+}
+`;
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
@@ -33,36 +52,44 @@ function isEsmRepo(repoDir: string): boolean {
   }
 }
 
-function hasNpmTestScript(repoDir: string): boolean {
-  const pkgPath = join(repoDir, 'package.json');
-  if (!existsSync(pkgPath)) return false;
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
-      scripts?: Record<string, string>;
-    };
-    return Boolean(pkg.scripts?.test?.trim());
-  } catch {
-    return false;
-  }
-}
-
-function deriveCoverageInclude(sourcePaths: string[]): string {
-  const includes = new Set<string>();
-  for (const p of sourcePaths) {
-    const normalized = normalizePath(p);
-    const parts = normalized.split('/');
-    if (parts.length > 1) {
-      includes.add(`${parts[0]}/**`);
-    } else {
-      includes.add(normalized);
-    }
-  }
-  return [...includes].join(',');
-}
-
 function isCliEntryPoint(sourcePath: string): boolean {
   const base = sourcePath.split('/').pop() ?? sourcePath;
   return base === 'cli.js' || base === 'main.js' || base === 'index.js';
+}
+
+function needsRuntimeRegister(paths: string[]): boolean {
+  return needsJsTranspileLoader(paths);
+}
+
+function runtimeRegisterSetupCommand(paths: string[]): string | null {
+  if (!needsRuntimeRegister(paths)) return null;
+  const body = [
+    `require('fs').writeFileSync(${JSON.stringify(TEST_REGISTER_PATH)}, ${JSON.stringify(TEST_REGISTER_CONTENT)})`,
+    `require('fs').writeFileSync(${JSON.stringify(TEST_LOADER_PATH)}, ${JSON.stringify(TEST_LOADER_CONTENT)})`,
+  ].join(';');
+  return `node -e ${shellQuote(body)}`;
+}
+
+function nodeLoaderPrefix(paths: string[]): string {
+  if (!needsJsTranspileLoader(paths)) return '';
+  const loaderRegister =
+    `data:text/javascript,import { register } from "node:module"; ` +
+    `import { pathToFileURL } from "node:url"; ` +
+    `register("./${TEST_LOADER_PATH}", pathToFileURL("./"));`;
+  return [
+    '--require',
+    shellQuote(`./${TEST_REGISTER_PATH}`),
+    '--import',
+    shellQuote(loaderRegister),
+    '--import',
+    'tsx',
+    '',
+  ].join(' ');
+}
+
+function withRuntimeRegister(paths: string[], command: string): string {
+  const setup = runtimeRegisterSetupCommand(paths);
+  return setup ? `${setup} && ${command}` : command;
 }
 
 function buildSourceImportCommand(repoDir: string, sourcePaths: string[]): string {
@@ -77,16 +104,17 @@ function buildSourceImportCommand(repoDir: string, sourcePaths: string[]): strin
   }
 
   const paths = targets.map((p) => (p.startsWith('./') ? p : `./${p}`));
+  const loader = nodeLoaderPrefix(targets);
 
   if (isEsmRepo(repoDir)) {
     const body = paths
       .map((p) => `try{await import(${shellQuote(p)})}catch(e){}`)
       .join(';');
-    return `node --input-type=module -e ${shellQuote(body)}`;
+    return withRuntimeRegister(targets, `node ${loader}--input-type=module -e ${shellQuote(body)}`);
   }
 
   const body = paths.map((p) => `try{require(${shellQuote(p)})}catch(e){}`).join(';');
-  return `node -e ${shellQuote(body)}`;
+  return withRuntimeRegister(targets, `node ${loader}-e ${shellQuote(body)}`);
 }
 
 function buildRunTarget(
@@ -95,21 +123,25 @@ function buildRunTarget(
   testPaths: string[],
 ): string {
   if (testPaths.length > 0) {
-    return `node --test ${testPaths.map(shellQuote).join(' ')}`;
+    const runtimePaths = [...testPaths, ...sourcePaths];
+    const loader = nodeLoaderPrefix(runtimePaths);
+    return withRuntimeRegister(
+      runtimePaths,
+      `node ${loader}--test ${testPaths.map(shellQuote).join(' ')}`,
+    );
   }
 
-  if (hasNpmTestScript(repoDir)) {
-    return 'npm test -- --passWithNoTests';
-  }
-
+  // No PR-specific tests were found. Avoid running the repository-wide test
+  // suite here; import only changed source files so diff coverage stays scoped
+  // to the PR files under analysis.
   return buildSourceImportCommand(repoDir, sourcePaths);
 }
 
 function coverageToolPrefix(sourcePaths: string[]): string {
-  const include =
+  const includes =
     sourcePaths.length > 0
-      ? `--include='${deriveCoverageInclude(sourcePaths)}'`
-      : "--include='**/*'";
+      ? sourcePaths.map((p) => `--include=${shellQuote(normalizePath(p))}`)
+      : ["--include='**/*'"];
 
   // c8 uses V8 native coverage and works with ESM; nyc/istanbul often reports 0% for "type":"module" repos.
   return [
@@ -117,7 +149,7 @@ function coverageToolPrefix(sourcePaths: string[]): string {
     '--reporter=cobertura',
     '--reporter=text',
     '--all',
-    include,
+    ...includes,
     "--exclude='tests/**'",
     "--exclude='**/*.test.js'",
     "--exclude='**/*.spec.js'",
@@ -131,13 +163,21 @@ function coverageToolPrefix(sourcePaths: string[]): string {
   ].join(' ');
 }
 
+/** c8 only collects V8 coverage from its direct child process. */
+function wrapForCoverageInstrumentedChild(command: string): string {
+  if (!command.includes(' && ')) return command;
+  return `sh -c ${shellQuote(command)}`;
+}
+
 export function buildJsCoverageCommand(
   sourcePaths: string[],
   testPaths: string[],
   repoDir?: string,
 ): string {
   const dir = repoDir ?? '.';
-  const runTarget = buildRunTarget(dir, sourcePaths, testPaths);
+  const runTarget = wrapForCoverageInstrumentedChild(
+    buildRunTarget(dir, sourcePaths, testPaths),
+  );
   return `${coverageToolPrefix(sourcePaths)} ${runTarget}`;
 }
 
@@ -224,6 +264,25 @@ function testFileMatchesSource(testPath: string, sourcePath: string): boolean {
   );
 }
 
+function isNodeTestCompatible(repoDir: string, testPath: string): boolean {
+  let content: string;
+  try {
+    content = readFileSync(join(repoDir, testPath), 'utf-8');
+  } catch {
+    return false;
+  }
+
+  if (/\bfrom\s+['"](?:node:)?test['"]/.test(content) || /require\(\s*['"](?:node:)?test['"]\s*\)/.test(content)) {
+    return true;
+  }
+
+  if (/\bfrom\s+['"](?:vitest|@jest\/globals)['"]/.test(content)) {
+    return false;
+  }
+
+  return !/\b(?:describe|it|expect|beforeEach|afterEach)\s*\(/.test(content);
+}
+
 export async function collectJsTestPaths(
   repoDir: string,
   changedFiles: ChangedFile[],
@@ -235,7 +294,10 @@ export async function collectJsTestPaths(
   for (const file of changedFiles) {
     if (!/\.(js|jsx|ts|tsx)$/.test(file.path) || file.status === 'deleted') continue;
     if (isTestFile(file.path)) {
-      testPaths.add(normalizePath(file.path));
+      const normalized = normalizePath(file.path);
+      if (isNodeTestCompatible(repoDir, normalized)) {
+        testPaths.add(normalized);
+      }
     }
   }
 
@@ -255,7 +317,7 @@ export async function collectJsTestPaths(
     }
 
     for (const candidate of guessTestFileNames(sourcePath)) {
-      if (existsSync(join(repoDir, candidate))) {
+      if (existsSync(join(repoDir, candidate)) && isNodeTestCompatible(repoDir, candidate)) {
         testPaths.add(normalizePath(candidate));
       }
     }
@@ -267,7 +329,10 @@ export async function collectJsTestPaths(
       walkJsTestFiles(join(repoDir, testsDir), repoDir, allTests);
     }
     for (const testPath of allTests) {
-      if (sourcePaths.some((s) => testFileMatchesSource(testPath, s))) {
+      if (
+        isNodeTestCompatible(repoDir, testPath) &&
+        sourcePaths.some((s) => testFileMatchesSource(testPath, s))
+      ) {
         testPaths.add(testPath);
       }
     }
