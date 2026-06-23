@@ -44,7 +44,7 @@ export function detectRepoSetup(repoDir: string): RepoSetup {
   const hasPackageJson = existsSync(join(repoDir, 'package.json'));
 
   const coverageDeps = 'coverage pytest pytest-asyncio';
-  const jsCoverageDeps = 'c8 check-code-coverage';
+  const jsCoverageDeps = 'c8 check-code-coverage tsx';
   const noVenv: RepoSetup = {
     isPython: false,
     isJavaScript: false,
@@ -98,7 +98,7 @@ export function detectRepoSetup(repoDir: string): RepoSetup {
   }
 
   const jsInstallBase = hasPackageLock ? 'npm ci' : 'npm install';
-  const jsInstallCommand = `${jsInstallBase} && npm install -D ${jsCoverageDeps}`;
+  const jsInstallCommand = `${jsInstallBase} && npm install --no-save --legacy-peer-deps ${jsCoverageDeps}`;
 
   if (hasPnpmLock) {
     return {
