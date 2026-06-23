@@ -429,13 +429,23 @@ export class PrAnalysisProcessor {
 
             totalGenerationAttempts += outcome.attempts;
 
-            if (outcome.test) {
+            if (outcome.test && outcome.passed) {
               generatedTests.push(outcome.test);
               generatedTestResults.push({
                 filePath: outcome.test.filePath,
-                passed: outcome.passed,
+                passed: true,
               });
               declaredTestDeps.push(...outcome.declaredDeps);
+            } else if (outcome.test && !outcome.passed) {
+              await this.log(
+                data.prRunId,
+                'warn',
+                `Excluding ${outcome.test.filePath} from PR — test did not pass after ${outcome.attempts} repair attempt(s)`,
+              );
+              generatedTestResults.push({
+                filePath: outcome.test.filePath,
+                passed: false,
+              });
             }
           } catch (err) {
             const msg = `Test generation failed for ${file.path}: ${(err as Error).message}`;
@@ -923,7 +933,6 @@ export class PrAnalysisProcessor {
   }> {
     let lastFailureLogs = '';
     let previousContent = '';
-    let lastTest: GeneratedTest | null = null;
     const declaredDeps: string[] = [];
 
     for (let attempt = 1; attempt <= this.maxGenerationAttempts; attempt++) {
@@ -952,7 +961,6 @@ export class PrAnalysisProcessor {
       generated.content = parsed.content;
       declaredDeps.push(...parsed.declaredDeps);
       previousContent = generated.content;
-      lastTest = generated;
 
       const testDir = join(
         params.runDir,
@@ -1068,7 +1076,7 @@ export class PrAnalysisProcessor {
     }
 
     return {
-      test: lastTest,
+      test: null,
       passed: false,
       attempts: this.maxGenerationAttempts,
       declaredDeps,
