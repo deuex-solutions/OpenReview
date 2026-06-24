@@ -1,4 +1,4 @@
-import { inferJavaScriptTestFilePath, inferSourceImportPath, inferTestFilePath, sourceFileExtension } from '../test-paths';
+import {  inferSourceImportPath, inferTestFilePath, sourceFileExtension } from '../test-paths';
 import type { TestGenerationContext } from '../types';
 
 function formatRepoPackages(packages: string[]): string {
