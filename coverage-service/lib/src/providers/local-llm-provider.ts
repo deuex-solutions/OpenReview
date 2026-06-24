@@ -1,8 +1,8 @@
 import { buildTestGenerationPrompt } from '../prompts/test-generation';
 import { inferTestFilePath } from '../test-paths';
-import type { GeneratedTest, TestGenerationContext } from '../types';
+import type { TestGenerationContext } from '../types';
 
-import type { TestGenerationProvider } from './test-generation-provider';
+import type { GeneratedTestWithUsage, TestGenerationProvider } from './test-generation-provider';
 
 function outputPathFor(context: TestGenerationContext): string {
   return context.testOutputPath ?? inferTestFilePath(context.file, context.framework);
@@ -18,7 +18,7 @@ export class LocalLLMProvider implements TestGenerationProvider {
 
   constructor(private readonly config: LocalLLMProviderConfig) {}
 
-  async generateTests(context: TestGenerationContext): Promise<GeneratedTest> {
+  async generateTests(context: TestGenerationContext): Promise<GeneratedTestWithUsage> {
     const prompt = buildTestGenerationPrompt(context);
     const baseUrl = this.config.baseUrl ?? 'http://localhost:8000/v1';
 
@@ -48,6 +48,7 @@ export class LocalLLMProvider implements TestGenerationProvider {
       filePath: outputPathFor(context),
       content,
       targetFile: context.file,
+      usage: null, // Local LLM — no cost tracking
     };
   }
 }

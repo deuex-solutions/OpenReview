@@ -191,6 +191,8 @@ A separate **coverage-service** microservice (`coverage-service/`) sits behind O
 3. Runs Python `diff-cover` to compute coverage *on the PR's changed lines only*.
 4. Asks an LLM (OpenAI / Anthropic) to generate unit tests for files below the threshold.
 5. Verifies the new tests pass with `node --test`, then recomputes coverage.
+6. Records LLM token usage and calculates estimated cost based on the model pricing.
+7. Displays PR runs, coverage deltas, token usage, and total spend in the Next.js **Coverage Dashboard** (`web/`).
 
 OpenReview then takes those generated files, **opens a stacked PR** against the original feature branch, and **posts a coverage-delta comment** on the original PR. See [Kenil27/band#4](https://github.com/Kenil27/band/pull/4) for an example.
 
@@ -264,9 +266,9 @@ cp .env.example .env                                # GITHUB_PAT, OPENAI_API_KEY
 cp service/.env.example service/.env                # add the same GITHUB_PAT
 cp coverage-service/.env.example coverage-service/.env  # add the same GITHUB_PAT + OPENAI_API_KEY
 
-# 3. Generate the Prisma client + push the schema to Postgres
+# 3. Generate the Prisma client + run database migrations
 pnpm coverage:db:generate
-pnpm coverage:db:push
+pnpm coverage:db:migrate
 
 # 4. Install the Python diff-cover binary the coverage worker shells out to
 pnpm coverage:setup:worker-deps
@@ -277,7 +279,7 @@ pnpm coverage:setup:worker-deps
 #       COVERAGE_SERVICE_URL=http://localhost:3010
 ```
 
-### Run the stack (4 terminals)
+### Run the stack (5 terminals)
 
 | # | Command | Binds | Role |
 |---|---|---|---|
@@ -285,8 +287,10 @@ pnpm coverage:setup:worker-deps
 | 2 | `pnpm coverage:dev:worker` | (none) | Coverage-service worker — does the actual clone + coverage + LLM work |
 | 3 | `pnpm --filter @openreview/service start:web` | `:3003` | OpenReview HTTP — webhooks + `/coverage-runs/trigger` |
 | 4 | `pnpm --filter @openreview/service start:worker` | (none) | OpenReview worker — opens the stacked PR + posts the comment |
+| 5 | `cd web && pnpm dev` | `:3000` | Next.js Coverage & Cost Monitoring Dashboard |
 
 > Ports are configurable. `:3010` is `API_PORT` in `coverage-service/.env`; `:3003` is `PORT` in `service/.env`.
+
 
 ### Verified end-to-end flow (curl path, no webhook needed)
 
