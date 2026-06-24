@@ -5,10 +5,12 @@ import { join } from 'path';
 import type {
   PrAnalysisJobData,
   GeneratedTest,
+  GeneratedTestWithUsage,
   PrRunStatus,
   ChangedFile,
   CoverageWorkflowSummary,
   DiffCoverageReport,
+  LlmUsage,
   GitHubProvider} from '@openreview/coverage-lib';
 import {
   pathsMatch,
@@ -949,6 +951,11 @@ export class PrAnalysisProcessor {
         return { test: null, passed: false, attempts: attempt, declaredDeps };
       }
 
+      // Persist LLM usage for this attempt (including repair rounds)
+      if (generated.usage) {
+        await this.persistUsage(params.prRunId, null, generated.usage);
+      }
+
       const parsed = parseGeneratedTestContent(generated.content);
       generated.content = parsed.content;
       declaredDeps.push(...parsed.declaredDeps);
@@ -1089,7 +1096,7 @@ export class PrAnalysisProcessor {
       previousTestContent: string;
       attemptNumber: number;
     },
-  ): Promise<GeneratedTest | null> {
+  ): Promise<GeneratedTestWithUsage | null> {
     const source = await this.repoProvider.getFileContent(repoDir, filePath);
     if (!source) return null;
 
@@ -1121,7 +1128,7 @@ export class PrAnalysisProcessor {
       framework,
     );
 
-    return this.llmProvider.generateTests({
+    const result = await this.llmProvider.generateTests({
       language,
       framework,
       file: filePath,
@@ -1140,6 +1147,7 @@ export class PrAnalysisProcessor {
       testOutputPath: testFile.testOutputPath,
       isUpdatingExistingTest: testFile.isUpdatingExistingTest,
     });
+    return result;
   }
 
   private computeFilesImproved(before: string[], after: string[]): string[] {
@@ -1167,6 +1175,30 @@ export class PrAnalysisProcessor {
       where: { id: prRunId },
       data: { status },
     });
+  }
+
+  private async persistUsage(
+    prRunId: string,
+    testGenerationRunId: string | null,
+    usage: LlmUsage,
+  ) {
+    try {
+      await prisma.llmUsageRecord.create({
+        data: {
+          prRunId,
+          testGenerationRunId,
+          provider: usage.provider,
+          modelName: usage.modelName,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          totalTokens: usage.totalTokens,
+          estimatedCostUsd: usage.estimatedCostUsd,
+        },
+      });
+    } catch (err) {
+      // Non-fatal: cost tracking must not break PR analysis
+      console.warn(`[${prRunId}] Failed to persist LLM usage record:`, (err as Error).message);
+    }
   }
 
   private async log(prRunId: string, level: string, message: string) {

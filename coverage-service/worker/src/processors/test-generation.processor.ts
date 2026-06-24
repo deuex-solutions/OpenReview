@@ -7,7 +7,8 @@ import type {
   TestGenerationStatus,
   GitHubProvider,
   ChangedFile,
-  DiffCoverageReport} from '@openreview/coverage-lib';
+  DiffCoverageReport,
+  LlmUsage} from '@openreview/coverage-lib';
 import {
   detectFramework,
   detectLanguage,
@@ -224,6 +225,7 @@ export class TestGenerationProcessor {
       );
 
       const generated = await this.generateTestForFile({
+        runId: data.runId,
         runDir,
         filePath: targetFile,
         baseRef,
@@ -431,6 +433,7 @@ export class TestGenerationProcessor {
   }
 
   private async generateTestForFile(params: {
+    runId: string;
     runDir: string;
     filePath: string;
     baseRef: string;
@@ -480,7 +483,7 @@ export class TestGenerationProcessor {
       framework,
     );
 
-    return this.llmProvider.generateTests({
+    const result = await this.llmProvider.generateTests({
       language,
       framework,
       file: params.filePath,
@@ -496,6 +499,12 @@ export class TestGenerationProcessor {
       testOutputPath: testFile.testOutputPath,
       isUpdatingExistingTest: testFile.isUpdatingExistingTest,
     });
+
+    if (result.usage) {
+      await this.persistUsage(params.runId, null, result.usage);
+    }
+
+    return result;
   }
 
   private async updateStatus(runId: string, status: TestGenerationStatus) {
@@ -503,6 +512,30 @@ export class TestGenerationProcessor {
       where: { id: runId },
       data: { status },
     });
+  }
+
+  private async persistUsage(
+    testGenerationRunId: string | null,
+    prRunId: string | null,
+    usage: LlmUsage,
+  ) {
+    try {
+      await prisma.llmUsageRecord.create({
+        data: {
+          testGenerationRunId,
+          prRunId,
+          provider: usage.provider,
+          modelName: usage.modelName,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          totalTokens: usage.totalTokens,
+          estimatedCostUsd: usage.estimatedCostUsd,
+        },
+      });
+    } catch (err) {
+      // Non-fatal: cost tracking should never break test generation
+      console.warn('[test-gen] Failed to persist LLM usage record:', (err as Error).message);
+    }
   }
 
   private async log(runId: string, level: string, message: string) {

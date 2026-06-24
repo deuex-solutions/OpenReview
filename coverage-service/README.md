@@ -66,7 +66,7 @@ pnpm coverage:dev:worker
 ### 4. Register a repository
 
 ```bash
-curl -X POST http://localhost:3000/repositories \
+curl -X POST http://localhost:3010/repositories \
   -H "Content-Type: application/json" \
   -d '{
     "githubRepo": "owner/repo",
@@ -78,10 +78,49 @@ curl -X POST http://localhost:3000/repositories \
 
 ### 5. Configure GitHub webhook
 
-- **URL:** `http://<your-host>:3000/webhooks/github`
+- **URL:** `http://<your-host>:3010/webhooks/github`
 - **Content type:** `application/json`
 - **Secret:** same value as `WEBHOOK_SECRET` in `.env`
 - **Events:** Pull requests
+
+## Database Migrations
+
+Before starting the services, ensure all database migrations are applied to create the `LlmUsageRecord` and other tables:
+
+```bash
+pnpm coverage:db:migrate
+```
+
+If you modify the Prisma schema (`coverage-service/api/prisma/schema.prisma`), you can create a new migration locally using:
+
+```bash
+npx prisma migrate dev --name <migration_name> --schema=coverage-service/api/prisma/schema.prisma
+```
+
+## LLM Cost Monitoring Dashboard (Web UI)
+
+A Next.js dashboard is available in the `web/` directory to monitor coverage runs, LLM token counts, and estimated cost tracking.
+
+### Running the Dashboard
+
+```bash
+cd web
+pnpm install
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Configuration
+
+Ensure the following environment variables are aligned:
+
+*   **API (`coverage-service/.env`):**
+    *   `API_PORT=3010`
+    *   `DASHBOARD_SECRET`: A secret bearer token used to authenticate frontend dashboard requests.
+*   **Web UI (`web/.env.local`):**
+    *   `NEXT_PUBLIC_API_URL=http://localhost:3010` (points to the Coverage API port)
+    *   `DASHBOARD_SECRET`: Matches the API's secret token.
 
 ## API Endpoints
 
@@ -98,8 +137,11 @@ curl -X POST http://localhost:3000/repositories \
 | GET | `/pr-runs/:id/tests/:testId` | Download generated test |
 | POST | `/pr-runs/:id/retry` | Re-enqueue analysis |
 | GET | `/pr-runs/repository/:repositoryId` | List runs for a repo |
-| GET | `/test-generation-runs/:id` | Get test generation run status and JSON result (`generatedTest.fileName`, `generatedTest.content`) |
+| GET | `/test-generation-runs/:id` | Get test generation run status and JSON result |
+| **GET** | `/stats/global` | Exposes global LLM cost metrics (total spend, calls, tokens) |
+| **GET** | `/repositories/:id/cost-summary` | Exposes repository-specific cost details, breakdowns by model, and per-PR spending |
 
 ## Integration with OpenReview
 
 The main OpenReview review service (`@openreview/service`) can forward PR events to this service via its downstream dispatcher when `COVERAGE_SERVICE_URL` is configured (future integration).
+

@@ -25,7 +25,7 @@ if (args.length === 0) {
   process.exit(1);
 }
 
-const result = spawnSync('pnpm', ['exec', 'prisma', ...args], {
+const result = spawnSync('npx', ['prisma', ...args], {
   stdio: 'inherit',
   env: process.env,
   cwd: resolve(here, '..'),

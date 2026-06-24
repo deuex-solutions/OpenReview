@@ -52,6 +52,7 @@ model PullRequestRun {
   coverageResult CoverageResult?
   generatedTests GeneratedTestArtifact[]
   executionLogs  ExecutionLog[]
+  llmUsage       LlmUsageRecord[]
 
   @@index([repositoryId, prNumber])
 }
@@ -95,6 +96,7 @@ model TestGenerationRun {
   completedAt  DateTime?
   generatedTest GeneratedTestArtifact?
   executionLogs TestGenerationLog[]
+  llmUsage      LlmUsageRecord[]
 
   @@index([repositoryId, prNumber])
 }
@@ -128,4 +130,26 @@ model ExecutionLog {
   level     String         @default("info")
   message   String         @db.Text
   createdAt DateTime       @default(now())
+}
+
+model LlmUsageRecord {
+  id                  String             @id @default(cuid())
+  /// Set when the LLM call belongs to a full PR analysis run
+  prRunId             String?
+  prRun               PullRequestRun?    @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  /// Set when the LLM call belongs to a standalone test-generation run
+  testGenerationRunId String?
+  testGenerationRun   TestGenerationRun? @relation(fields: [testGenerationRunId], references: [id], onDelete: Cascade)
+
+  provider            String             // 'openai' | 'anthropic' | 'local'
+  modelName           String
+  promptTokens        Int
+  completionTokens    Int
+  totalTokens         Int
+  /// USD estimated at write-time from baked-in pricing table; null for unknown/local models
+  estimatedCostUsd    Float?
+  createdAt           DateTime           @default(now())
+
+  @@index([prRunId])
+  @@index([testGenerationRunId])
 }

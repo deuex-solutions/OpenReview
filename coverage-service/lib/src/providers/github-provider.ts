@@ -6,8 +6,8 @@ import { promisify } from 'util';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 
-import type { ChangedFile } from '../types';
 import { orderedTestFileCandidates } from '../test-paths';
+import type { ChangedFile } from '../types';
 
 import type {
   CheckoutPROptions,
