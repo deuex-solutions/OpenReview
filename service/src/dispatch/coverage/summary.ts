@@ -16,6 +16,8 @@ import type { PrRun } from './types.js';
 
 export interface SummaryInput {
   run: PrRun;
+  /** PR title — used for context when the description is empty. */
+  prTitle?: string;
   /** URL of the stacked test PR — omitted when no tests were generated. */
   testPrUrl?: string | null;
   /** Number of files included in the stacked PR (may be 0). */
@@ -44,6 +46,15 @@ export function buildOriginalPRComment(input: SummaryInput): string {
     `Coverage analysis ${describeStatus(run.status)} for PR #${run.prNumber}.`,
     '',
   ];
+
+  const headline = buildCoverageHeadline(run);
+  if (headline) {
+    lines.push(headline, '');
+  }
+
+  if (input.prTitle?.trim()) {
+    lines.push(`**${input.prTitle.trim()}**`, '');
+  }
 
   const diffRow = buildDiffCoverageTable(run);
   if (diffRow) {
@@ -122,6 +133,28 @@ function describeStatus(status: PrRun['status']): string {
     default:
       return 'finished';
   }
+}
+
+function buildCoverageHeadline(run: PrRun): string | null {
+  const diffAfter = run.diffCoverageAfter;
+  if (diffAfter == null) return null;
+
+  const workflow = run.workflowSummary as
+    | { thresholdReached?: boolean; targetCoverage?: number }
+    | null
+    | undefined;
+  const thresholdMet = workflow?.thresholdReached === true;
+  const target = workflow?.targetCoverage;
+
+  if (thresholdMet) {
+    return `✅ **${diffAfter.toFixed(1)}% diff coverage** · threshold met${target != null ? ` (${target}%)` : ''}`;
+  }
+
+  if (target != null && diffAfter < target) {
+    return `⚠️ **${diffAfter.toFixed(1)}% diff coverage** · below ${target}% target`;
+  }
+
+  return `**${diffAfter.toFixed(1)}% diff coverage**`;
 }
 
 function buildDiffCoverageTable(run: PrRun): string | null {

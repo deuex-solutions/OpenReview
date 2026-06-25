@@ -41,6 +41,27 @@ export interface ReviewSummary {
   mode: 'fast' | 'rlm';
   findingsBySeverity: Record<FindingSeverity, number>;
   totalFindings: number;
+  /** Open findings from the latest review pass. */
+  openFindings?: ReviewFinding[];
+  /** Findings fixed since the previous review pass. */
+  resolvedFindings?: Array<{
+    fingerprint: string;
+    category: FindingCategory;
+    severity: FindingSeverity;
+    file: string;
+    startLine: number;
+    title: string;
+  }>;
+  /** Findings that appeared only in this pass. */
+  newFindings?: ReviewFinding[];
+  /** Short narrative shown under the review header. */
+  narrative?: string;
+  /** True when no severe/non-severe/investigate findings remain open. */
+  approved?: boolean;
+  /** Head commit SHA for this review pass. */
+  headSha?: string;
+  resolvedCount?: number;
+  newCount?: number;
 }
 
 /** Diagnostic trace for observability into the review pipeline. */

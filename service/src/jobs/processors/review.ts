@@ -1,18 +1,31 @@
-import { runFastReview } from '@openreview/core';
+import {
+  buildFastReviewSummary,
+  fingerprintPullRequestDiff,
+  runFastReview,
+} from '@openreview/core';
 
+import type { ServiceConfig } from '../../config.js';
 import type { GitHubAuth } from '../../github/auth.js';
 import type { Logger } from '../../logger.js';
+import type { ReviewCache } from '../../review/review-cache.js';
 import type { FastReviewJob } from '../types.js';
 
 import { buildPRRuntime } from './context.js';
 
+export interface FastReviewDeps {
+  auth: GitHubAuth;
+  logger: Logger;
+  reviewCache: ReviewCache;
+  cfg: ServiceConfig;
+}
+
 /**
  * Process a fast review job: fetch PR data, run runFastReview, post results.
- * Mirrors what the GitHub Action does in action/src/pr-handler.ts.
+ * Reuses cached findings when an identical reviewable diff was seen before.
  */
 export async function processFastReview(
   job: FastReviewJob,
-  deps: { auth: GitHubAuth; logger: Logger },
+  deps: FastReviewDeps,
 ): Promise<void> {
   const log = deps.logger.child({
     job: 'review-fast',
@@ -23,23 +36,40 @@ export async function processFastReview(
   log.info('starting fast review');
 
   const { poster, pr } = await buildPRRuntime(job, deps.auth);
-
-  await poster.postAcknowledgement(
-    job.prNumber,
-    '[INFO] **OpenReview** — Review started... results will appear shortly.',
-  );
+  const fingerprint = fingerprintPullRequestDiff(pr.diff, pr.files);
 
   try {
-    const { findings, summary } = await runFastReview(pr);
+    const cached = await deps.reviewCache.get(job.owner, job.repo, fingerprint);
+    let findings;
+    let summary;
+    let fromCache = false;
 
-    if (findings.length > 0) {
-      await poster.postReview(job.prNumber, findings);
+    if (cached) {
+      findings = cached.findings;
+      summary = buildFastReviewSummary(findings, pr.files.length, 0);
+      fromCache = true;
+    } else {
+      const result = await runFastReview(pr);
+      findings = result.findings;
+      summary = result.summary;
+      await deps.reviewCache.set(job.owner, job.repo, fingerprint, findings);
     }
-    await poster.postSummaryComment(job.prNumber, summary);
+
+    const finalSummary = await poster.postReviewResults(job.prNumber, pr, findings, summary);
 
     log.info(
-      { findings: findings.length, duration: summary.duration },
-      'fast review complete',
+      {
+        findings: findings.length,
+        newFindings: finalSummary.newCount ?? findings.length,
+        resolved: finalSummary.resolvedCount ?? 0,
+        approved: finalSummary.approved ?? false,
+        duration: finalSummary.duration,
+        fromCache,
+        diffFingerprint: fingerprint.slice(0, 12),
+      },
+      fromCache
+        ? 'fast review complete (cache hit) — summary comment updated'
+        : 'fast review complete — summary comment updated',
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

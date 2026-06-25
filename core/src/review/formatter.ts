@@ -1,3 +1,4 @@
+import { embedReviewState, formatFindingListItem, type ReviewState } from './review-state.js';
 import type { FindingSeverity, ReviewFinding, ReviewSummary } from './types.js';
 
 /* ------------------------------------------------------------------ */
@@ -11,41 +12,71 @@ const SEVERITY_BADGES: Record<FindingSeverity, string> = {
   informational: '[INFO] **Informational**',
 };
 
-const SUMMARY_MARKER = '<!-- openreview-summary -->';
+export const SUMMARY_MARKER = '<!-- openreview-summary -->';
 
 /* ------------------------------------------------------------------ */
-/*  Summary Comment (§5.4)                                             */
+/*  Summary Comment                                                    */
 /* ------------------------------------------------------------------ */
 
-export function formatSummaryComment(summary: ReviewSummary): string {
-  let md = `${SUMMARY_MARKER}\n## OpenReview Summary\n\n`;
-  md += `**Files reviewed:** ${summary.filesReviewed} | **Duration:** ${summary.duration} | **Mode:** ${summary.mode}\n\n`;
+export function formatSummaryComment(summary: ReviewSummary, state?: ReviewState): string {
+  const lines: string[] = [SUMMARY_MARKER];
 
-  if (summary.totalFindings === 0) {
-    md += '[SUCCESS] No issues found.\n';
-  } else {
-    md += '| Severity | Count |\n|---|---|\n';
-
-    const order: FindingSeverity[] = ['severe', 'non-severe', 'investigate', 'informational'];
-    for (const sev of order) {
-      const count = summary.findingsBySeverity[sev];
-      if (count > 0) {
-        md += `| ${SEVERITY_BADGES[sev]} | ${count} |\n`;
-      }
-    }
-
-    md += `\n**Total:** ${summary.totalFindings} finding${summary.totalFindings === 1 ? '' : 's'}\n`;
+  if (state) {
+    lines.push(embedReviewState(state));
   }
 
-  md += '\n---\n';
-  md +=
-    '*Trigger deep review: `@openreview rlm` | Ask a question: `@openreview <your question>`*\n';
+  lines.push('## Code Review', '');
 
-  return md;
+  const resolvedCount = summary.resolvedCount ?? summary.resolvedFindings?.length ?? 0;
+  const openCount = summary.totalFindings;
+  const statusBadge = summary.approved ? '✅ **Approved**' : '⚠️ **Findings**';
+  const tally =
+    resolvedCount > 0
+      ? `**${resolvedCount} resolved** / **${openCount} open**`
+      : `**${openCount} finding${openCount === 1 ? '' : 's'}**`;
+
+  lines.push(`${statusBadge} · ${tally}`, '');
+
+  if (summary.narrative) {
+    lines.push(summary.narrative, '');
+  }
+
+  if (resolvedCount > 0 && summary.resolvedFindings?.length) {
+    lines.push(
+      '<details>',
+      `<summary>✅ ${resolvedCount} resolved</summary>`,
+      '',
+      ...summary.resolvedFindings.map(formatFindingListItem),
+      '',
+      '</details>',
+      '',
+    );
+  }
+
+  const openFindings = summary.openFindings ?? [];
+  if (openCount > 0 && openFindings.length > 0) {
+    lines.push(
+      '<details>',
+      `<summary>${summary.approved ? 'ℹ️' : '🔎'} ${openCount} open</summary>`,
+      '',
+      ...openFindings.map((f) => formatFindingListItem(f)),
+      '',
+      '</details>',
+      '',
+    );
+  } else if (openCount === 0) {
+    lines.push('✅ No open findings.', '');
+  }
+
+  lines.push(
+    `<sub>Files reviewed: ${summary.filesReviewed} · Duration: ${summary.duration}</sub>`,
+  );
+
+  return lines.join('\n');
 }
 
 /* ------------------------------------------------------------------ */
-/*  Inline Comment (§5.5)                                              */
+/*  Inline Comment                                                     */
 /* ------------------------------------------------------------------ */
 
 export function formatInlineComment(finding: ReviewFinding): string {
