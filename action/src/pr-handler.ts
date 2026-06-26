@@ -82,15 +82,11 @@ export async function handlePullRequest(context: Context): Promise<void> {
 
     const { findings, summary } = await runFastReview(prContext);
 
-    // Post batch review with inline comments
-    if (findings.length > 0) {
-      await poster.postReview(prNumber, findings);
-    }
+    const finalSummary = await poster.postReviewResults(prNumber, prContext, findings, summary);
 
-    // Post or update summary comment
-    await poster.postSummaryComment(prNumber, summary);
-
-    core.info(`Review complete: ${summary.totalFindings} findings in ${summary.duration}`);
+    core.info(
+      `Review complete: ${finalSummary.totalFindings} open, ${finalSummary.resolvedCount ?? 0} resolved (${finalSummary.duration})`,
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     core.error(`Review failed: ${msg}`);

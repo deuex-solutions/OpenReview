@@ -14,13 +14,23 @@ export type { ParsedDiff, Hunk, Line, MoveEvent } from './github/diff.js';
 export { CommentPoster } from './github/comments.js';
 
 // Review
-export { runFastReview } from './review/fast-review.js';
+export { runFastReview, buildFastReviewSummary } from './review/fast-review.js';
+export { fingerprintPullRequestDiff, normalizeDiffForFingerprint, extractDiffForFiles } from './review/diff-fingerprint.js';
+export { isReviewableFile, filterReviewableFiles } from './review/reviewable-files.js';
 export { runRLM } from './review/rlm-runner.js';
 export type { RLMEvent, RLMEventHandler, RLMEventType } from './review/rlm-runner.js';
 export { SnapshotBuilder } from './review/snapshot.js';
 export type { SnapshotOptions } from './review/snapshot.js';
 export { runLinters, deduplicateFindings } from './review/linters.js';
 export { formatInlineComment, formatSummaryComment } from './review/formatter.js';
+export {
+  parseReviewState,
+  enrichReviewSummary,
+  buildReviewState,
+  fingerprintFinding,
+  diffReviewFindings,
+} from './review/review-state.js';
+export type { ReviewState, StoredFinding, ReviewDiff } from './review/review-state.js';
 export { sortFindings } from './review/types.js';
 export type {
   ReviewFinding,

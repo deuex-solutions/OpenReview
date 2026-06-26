@@ -85,6 +85,7 @@ function makeLogger(): Logger {
 function makeRuntime() {
   const poster = {
     postAcknowledgement: vi.fn(async () => {}),
+    postCoverageComment: vi.fn(async () => {}),
   } as unknown as CommentPoster;
   const client = {} as unknown as GitHubClient;
   const pr = {} as PRContext;
@@ -183,9 +184,10 @@ describe('processCoverageAnalysis', () => {
       }),
     );
 
-    // 1 ack + 1 summary
-    expect(poster.postAcknowledgement).toHaveBeenCalledTimes(2);
-    const summary = (poster.postAcknowledgement as unknown as ReturnType<typeof vi.fn>).mock.calls[1][1] as string;
+    // 1 ack + 1 coverage summary (updated in place on later pushes)
+    expect(poster.postAcknowledgement).toHaveBeenCalledTimes(1);
+    expect(poster.postCoverageComment).toHaveBeenCalledTimes(1);
+    const summary = (poster.postCoverageComment as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(summary).toContain('Diff coverage');
     expect(summary).toContain('https://github.com/kenil27/band/pull/99');
   });

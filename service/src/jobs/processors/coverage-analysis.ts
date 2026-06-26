@@ -71,21 +71,12 @@ export async function processCoverageAnalysis(
     prNumber: job.prNumber,
   });
 
-  log.info({ prRunId: job.prRunId }, 'starting coverage analysis');
-
   const { client, poster } = await buildPRRuntime(job, deps.auth);
   const coverage = (deps.coverageClientFactory ?? defaultCoverageClientFactory)(
     deps,
   );
 
-  // Only post the "started" ack on the first attempt — repeated comments are
-  // annoying when BullMQ retries the job.
-  if (!job.prRunId) {
-    await poster.postAcknowledgement(
-      job.prNumber,
-      '[INFO] **OpenReview** — Coverage analysis started. A stacked PR with the generated tests will be opened on completion.',
-    );
-  }
+
 
   // ------------------------------------------------------------------ //
   // 1) Ensure repository is registered                                  //
@@ -164,15 +155,26 @@ export async function processCoverageAnalysis(
   }
 
   // ------------------------------------------------------------------ //
-  // 6) Summary comment on the original PR                                //
+  // 6) Summary comment on the original PR (posted last so it stays at     //
+  //    the bottom of the timeline after the stacked-test commit).        //
   // ------------------------------------------------------------------ //
 
   const summary = buildOriginalPRComment({
     run,
+    prTitle: job.title,
     testPrUrl,
     testPrFileCount,
   });
-  await poster.postAcknowledgement(job.prNumber, summary);
+  await poster.postCoverageComment(job.prNumber, summary);
+  log.info(
+    {
+      prRunId,
+      diffCoverageAfter: run.diffCoverageAfter,
+      testPrUrl,
+      testPrFileCount,
+    },
+    'coverage summary comment updated',
+  );
 
   if (run.status === 'FAILED') {
     // Throw so BullMQ records the attempt as failed — useful in the dashboard.

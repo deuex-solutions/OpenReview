@@ -17,6 +17,7 @@ import { processRlmReview } from './jobs/processors/rlm.js';
 import { QUEUE_NAME } from './jobs/types.js';
 import type { CoverageAnalysisJob, OpenReviewJob } from './jobs/types.js';
 import { createLogger } from './logger.js';
+import { ReviewCache } from './review/review-cache.js';
 
 /**
  * Worker entrypoint. Pulls jobs from BullMQ and runs the corresponding
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
 
   const auth = createPatAuth(cfg);
   const connection = createRedisConnection(cfg);
+  const reviewCache = new ReviewCache(connection, cfg, logger);
 
   const worker = new Worker<OpenReviewJob>(
     QUEUE_NAME,
@@ -45,7 +47,7 @@ async function main(): Promise<void> {
       const data = job.data;
       switch (data.kind) {
         case 'review-fast':
-          return processFastReview(data, { auth, logger });
+          return processFastReview(data, { auth, logger, reviewCache, cfg });
         case 'review-rlm':
           return processRlmReview(data, { auth, logger });
         case 'chat':

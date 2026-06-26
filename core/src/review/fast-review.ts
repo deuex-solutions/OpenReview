@@ -6,6 +6,7 @@ import { config } from '../config/env.js';
 import { createMainLLM, createStructuredLLM } from '../llm/router.js';
 
 import { deduplicateFindings, runLinters } from './linters.js';
+import { isReviewableFile } from './reviewable-files.js';
 import type {
   FindingSeverity,
   PRContext,
@@ -100,37 +101,6 @@ const CATEGORY_BUG_KEYWORDS = [
 function normalizeCategory(raw: string): 'bug' | 'flag' {
   const s = raw.toLowerCase();
   return CATEGORY_BUG_KEYWORDS.some((kw) => s.includes(kw)) ? 'bug' : 'flag';
-}
-
-/* ------------------------------------------------------------------ */
-/*  Non-reviewable file patterns                                       */
-/* ------------------------------------------------------------------ */
-
-const SKIP_PATTERNS = [
-  /^yarn\.lock$/,
-  /^pnpm-lock\.yaml$/,
-  /^package-lock\.json$/,
-  /\.lock$/,
-  /\.min\.(js|css)$/,
-  /\.map$/,
-  /\.snap$/,
-  /\.svg$/,
-  /\.png$/,
-  /\.jpg$/,
-  /\.jpeg$/,
-  /\.gif$/,
-  /\.ico$/,
-  /\.woff2?$/,
-  /\.ttf$/,
-  /\.eot$/,
-  /\.pdf$/,
-  /dist\//,
-  /\.generated\./,
-  /vendor\//,
-];
-
-function isReviewableFile(filename: string): boolean {
-  return !SKIP_PATTERNS.some((pattern) => pattern.test(filename));
 }
 
 /* ------------------------------------------------------------------ */
@@ -286,7 +256,7 @@ export async function runFastReview(
     }
   }
 
-  const summary = buildSummary(sorted, pr.files.length, duration);
+  const summary = buildFastReviewSummary(sorted, pr.files.length, duration);
 
   return { findings: sorted, summary, trace };
 }
@@ -1009,7 +979,7 @@ function validateWithSnap(
 /*  Summary builder                                                    */
 /* ------------------------------------------------------------------ */
 
-function buildSummary(
+export function buildFastReviewSummary(
   findings: ReviewFinding[],
   fileCount: number,
   durationMs: number,

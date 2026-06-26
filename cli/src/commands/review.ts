@@ -134,15 +134,15 @@ export function registerReviewCommand(program: Command): void {
           }
 
           const poster = new CommentPoster(client);
-
-          if (findings.length > 0) {
-            await poster.postReview(prNumber, findings);
-          }
-
-          await poster.postSummaryComment(prNumber, summary);
+          const finalSummary = await poster.postReviewResults(
+            prNumber,
+            prContext,
+            findings,
+            summary,
+          );
 
           process.stderr.write(
-            `✅ Review posted on PR #${prNumber} (${findings.length} finding${findings.length === 1 ? '' : 's'})\n`,
+            `✅ Review posted on PR #${prNumber} (${finalSummary.totalFindings} open, ${finalSummary.resolvedCount ?? 0} resolved)\n`,
           );
         }
       } catch (err) {

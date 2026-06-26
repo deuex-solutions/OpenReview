@@ -80,6 +80,12 @@ const ConfigSchema = z.object({
   coverageServiceCoverageCommand: stringOrEmpty,
   coverageServiceTestCommand: stringOrEmpty,
   coverageServiceInstallCommand: stringOrEmpty,
+
+  reviewCacheEnabled: z
+    .string()
+    .optional()
+    .transform((raw) => raw?.toLowerCase() !== 'false'),
+  reviewCacheTtlSeconds: numberFromEnv(604_800), // 7 days
 });
 
 export type ServiceConfig = z.infer<typeof ConfigSchema> & {
@@ -126,6 +132,9 @@ export function loadServiceConfig(): ServiceConfig {
     coverageServiceCoverageCommand: process.env.COVERAGE_SERVICE_COVERAGE_COMMAND,
     coverageServiceTestCommand: process.env.COVERAGE_SERVICE_TEST_COMMAND,
     coverageServiceInstallCommand: process.env.COVERAGE_SERVICE_INSTALL_COMMAND,
+
+    reviewCacheEnabled: process.env.REVIEW_CACHE_ENABLED,
+    reviewCacheTtlSeconds: process.env.REVIEW_CACHE_TTL_SECONDS,
   });
 
   return {

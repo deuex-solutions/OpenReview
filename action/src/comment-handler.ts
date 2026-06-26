@@ -151,10 +151,7 @@ export async function handleComment(context: Context): Promise<void> {
 
       const { findings, summary } = await runFastReview(prContext);
 
-      if (findings.length > 0) {
-        await poster.postReview(prNumber, findings);
-      }
-      await poster.postSummaryComment(prNumber, summary);
+      await poster.postReviewResults(prNumber, prContext, findings, summary);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await poster.postAcknowledgement(prNumber, `[ERROR] **OpenReview** — Review failed: ${msg}`);

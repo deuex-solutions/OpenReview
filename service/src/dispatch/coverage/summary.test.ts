@@ -34,11 +34,24 @@ describe('buildOriginalPRComment', () => {
   it('includes the test PR link when files were generated', () => {
     const out = buildOriginalPRComment({
       run: baseRun,
+      prTitle: 'feat: add array helpers',
       testPrUrl: 'https://github.com/kenil27/band/pull/99',
       testPrFileCount: 3,
     });
+    expect(out).toContain('**feat: add array helpers**');
     expect(out).toContain('Generated **3 test files**');
     expect(out).toContain('https://github.com/kenil27/band/pull/99');
+  });
+
+  it('shows threshold headline when workflow reports threshold met', () => {
+    const out = buildOriginalPRComment({
+      run: {
+        ...baseRun,
+        workflowSummary: { thresholdReached: true, targetCoverage: 80 },
+      },
+    });
+    expect(out).toContain('threshold met');
+    expect(out).toContain('73.5% diff coverage');
   });
 
   it('says "no tests" when run completed without files', () => {
