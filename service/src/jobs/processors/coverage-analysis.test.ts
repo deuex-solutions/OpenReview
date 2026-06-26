@@ -184,8 +184,8 @@ describe('processCoverageAnalysis', () => {
       }),
     );
 
-    // 1 ack + 1 coverage summary (updated in place on later pushes)
-    expect(poster.postAcknowledgement).toHaveBeenCalledTimes(1);
+    // Coverage summary only (no separate ack comment — keeps PR thread clean)
+    expect(poster.postAcknowledgement).not.toHaveBeenCalled();
     expect(poster.postCoverageComment).toHaveBeenCalledTimes(1);
     const summary = (poster.postCoverageComment as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(summary).toContain('Diff coverage');
