@@ -28,6 +28,12 @@ export class WebhooksController {
       return this.webhooksService.handlePullRequest(payload);
     }
 
+    // GitHub App installation events — fired when someone installs/uninstalls
+    // the app or grants/revokes access to individual repos.
+    if (event === 'installation' || event === 'installation_repositories') {
+      return this.webhooksService.handleInstallation(payload);
+    }
+
     return { received: true, event };
   }
 

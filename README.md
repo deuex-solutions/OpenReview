@@ -200,17 +200,19 @@ OpenReview then takes those generated files, **opens a stacked PR** against the 
 
 ```text
                               ┌────────────────────────────────────────────┐
-GitHub PR ─► webhook OR curl ─►│ OpenReview service                         │
-                              │   • POST /webhook    (webhook path)        │
-                              │   • POST /coverage-runs/trigger (curl path)│
-                              └─────────────┬──────────────────────────────┘
-                                            │  POST /repositories
-                                            │  POST /repositories/:id/analyze
-                                            │  GET  /pr-runs/:id   (polled)
-                                            ▼
+GitHub App ──webhook─────────►│ OpenReview service (:3003)                 │
+  pull_request                │   • POST /webhook                          │
+  installation*               │   • POST /webhooks/github  (alias)         │
+                              │   • POST /coverage-runs/trigger (manual) │
+                              │   → review-fast + coverage-analysis jobs   │
+                              └──────┬─────────────────────┬───────────────┘
+                                     │ installation*       │ HTTP (localhost)
+                                     │ forwarded           │ POST /repositories/:id/analyze
+                                     ▼                     ▼
                               ┌────────────────────────────────────────────┐
-                              │ coverage-service (NestJS API + BullMQ worker)│
-                              │   clone → install → c8 → diff-cover →       │
+                              │ coverage-service (:3010)                   │
+                              │   Nest API + BullMQ worker                 │
+                              │   clone → install → c8 → diff-cover →      │
                               │   LLM test gen → node --test → re-cover    │
                               └─────────────┬──────────────────────────────┘
                                             │  generatedTestFiles[]
@@ -222,6 +224,10 @@ GitHub PR ─► webhook OR curl ─►│ OpenReview service                   
                               │   • open stacked PR → feature branch       │
                               │   • post coverage-delta comment on PR      │
                               └────────────────────────────────────────────┘
+
+* `installation` / `installation_repositories` events received by OpenReview
+  are forwarded to coverage-service so per-repo `githubInstallationId` values
+  are stored automatically.
 ```
 
 ### Prerequisites
@@ -233,10 +239,33 @@ GitHub PR ─► webhook OR curl ─►│ OpenReview service                   
 | **Postgres** | Coverage-service Prisma DB (`prcoverage`) | `createdb prcoverage` (or your DB UI) |
 | **Redis** | BullMQ for both services (queue names are disjoint, safe to share) | `brew services start redis` / `docker run redis` |
 | **Python 3** + **diff-cover** | The coverage worker shells out to it | `pnpm coverage:setup:worker-deps` (creates `coverage-service/worker/.venv-tools/`) |
-| **GitHub PAT** | One token used by every service for clone + comment + PR-author | See **PAT scopes** below |
+| **GitHub App** (recommended) | Posts reviews and coverage comments as your bot (`deuex-reviewer[bot]`), not a personal account | Install the app on target repos; set `GITHUB_AUTH_MODE=app` in `service/.env` and `coverage-service/.env` (see below) |
+| **GitHub PAT** (fallback) | Local dev without a GitHub App installation | Classic `ghp_…` token with `repo` scope, or fine-grained with Contents + Pull requests read/write |
 | **OpenAI key** | LLM that writes the tests (Anthropic also supported) | Paste into `coverage-service/.env` → `OPENAI_API_KEY=` |
 
-#### GitHub PAT scopes (critical — this is the most common failure)
+#### GitHub App setup (recommended for self-hosted bot)
+
+Install your GitHub App on the repos you want to review. Configure **both** env files with the same app credentials:
+
+```bash
+# service/.env — OpenReview web + worker (posts PR comments)
+GITHUB_AUTH_MODE=app
+GITHUB_APP_ID=<your-app-id>
+GITHUB_APP_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+# Leave blank to resolve per-repo via GitHub API; set only for single-org dev.
+# GITHUB_APP_INSTALLATION_ID=
+
+# coverage-service/.env — clone + analyze PRs
+GITHUB_AUTH_MODE=app
+GITHUB_APP_ID=<same-app-id>
+GITHUB_APP_PRIVATE_KEY=<same-private-key>
+```
+
+Webhook secret must match across the GitHub App settings, `service/.env` (`GITHUB_WEBHOOK_SECRET`), and `coverage-service/.env` (`WEBHOOK_SECRET`).
+
+When `GITHUB_AUTH_MODE=app`, comments and stacked PRs are attributed to the **app bot**, not your personal GitHub account.
+
+#### GitHub PAT scopes (when using `GITHUB_AUTH_MODE=pat`)
 
 OpenReview's PR-author path needs to create git blobs → trees → commits → refs. The review-only path (just commenting on a PR) only needs `pull-requests: write`, but **opening a stacked PR additionally needs `contents: write`**.
 
@@ -246,13 +275,15 @@ OpenReview's PR-author path needs to create git blobs → trees → commits → 
   - Metadata is auto-granted.
 - **Classic PAT** (`ghp_…`): the single `repo` scope covers everything we need. Easiest if you don't want to fiddle with fine-grained permissions.
 
-After regenerating the token, **the same value must be in all three `.env` files** (the rotated token will 401 wherever it isn't updated):
+After regenerating a PAT, **the same value must be in all three `.env` files** (the rotated token will 401 wherever it isn't updated). Skip this when using GitHub App auth (`GITHUB_AUTH_MODE=app`).
 
 ```
 .env                      # root — used by @openreview/core (CLI / action)
 service/.env              # OpenReview service (web + worker)
 coverage-service/.env     # coverage-service (api + worker)
 ```
+
+Only needed when `GITHUB_AUTH_MODE=pat` in the service / coverage env files.
 
 ### One-time setup
 
@@ -262,9 +293,9 @@ pnpm install
 pnpm build
 
 # 2. Configure env files (copy templates, paste your secrets)
-cp .env.example .env                                # GITHUB_PAT, OPENAI_API_KEY, ...
-cp service/.env.example service/.env                # add the same GITHUB_PAT
-cp coverage-service/.env.example coverage-service/.env  # add the same GITHUB_PAT + OPENAI_API_KEY
+cp .env.example .env                                # OPENAI_API_KEY, ...
+cp service/.env.example service/.env                # GITHUB_WEBHOOK_SECRET, GITHUB_AUTH_MODE=app, app creds
+cp coverage-service/.env.example coverage-service/.env  # WEBHOOK_SECRET (same as above), GITHUB_AUTH_MODE=app, OPENAI_API_KEY
 
 # 3. Generate the Prisma client + run database migrations
 pnpm coverage:db:generate
@@ -279,17 +310,19 @@ pnpm coverage:setup:worker-deps
 #       COVERAGE_SERVICE_URL=http://localhost:3010
 ```
 
-### Run the stack (5 terminals)
+### Run the stack (4–5 terminals)
 
 | # | Command | Binds | Role |
 |---|---|---|---|
-| 1 | `pnpm coverage:dev:api` | `:3010` | Coverage-service HTTP API (Nest) |
-| 2 | `pnpm coverage:dev:worker` | (none) | Coverage-service worker — does the actual clone + coverage + LLM work |
-| 3 | `pnpm --filter @openreview/service start:web` | `:3003` | OpenReview HTTP — webhooks + `/coverage-runs/trigger` |
-| 4 | `pnpm --filter @openreview/service start:worker` | (none) | OpenReview worker — opens the stacked PR + posts the comment |
-| 5 | `cd web && pnpm dev` | `:3000` | Next.js Coverage & Cost Monitoring Dashboard |
+| 1 | `pnpm coverage:dev:api` | `:3010` | Coverage-service HTTP API (Nest) — **internal**, not the public webhook target |
+| 2 | `pnpm coverage:dev:worker` | (none) | Coverage-service worker — clone + coverage + LLM test generation |
+| 3 | `pnpm --filter @openreview/service start:web` | `:3003` | OpenReview HTTP — **GitHub App webhook entrypoint** + `/coverage-runs/trigger` |
+| 4 | `pnpm --filter @openreview/service start:worker` | (none) | OpenReview worker — review, stacked PR, coverage comment |
+| 5 | `cd web && pnpm dev` | `:3000` | Next.js Coverage & Cost Monitoring Dashboard (optional) |
 
-> Ports are configurable. `:3010` is `API_PORT` in `coverage-service/.env`; `:3003` is `PORT` in `service/.env`.
+> **Ports:** `:3010` = `API_PORT` in `coverage-service/.env`; `:3003` = `PORT` in `service/.env`.
+>
+> **Local tunnel:** point ngrok (or similar) at **`:3003`**, not `:3010`. Example: `ngrok http 3003` → set the GitHub App webhook URL to `https://<tunnel>/webhooks/github`.
 
 
 ### Verified end-to-end flow (curl path, no webhook needed)
@@ -343,16 +376,27 @@ On GitHub:
   - A `Test file | Covers | Status` table mapping each generated `filePath` to its `targetFile` with ✅ / ❌ / — for the test execution result.
 - A `[INFO] OpenReview — Coverage` summary comment on the original PR.
 
-### Webhook path (alternative — also supported)
+### Webhook path (GitHub App — recommended)
 
-If you'd rather skip the curl trigger and have the pipeline fire automatically on every PR, point a GitHub webhook at OpenReview's `/webhook`:
+Point your **GitHub App** webhook at OpenReview on **port 3003** (not coverage-service on 3010):
 
-- **Payload URL**: `https://<your-tunnel>/webhook` (or `http://localhost:3003/webhook` over a tunnel)
-- **Content type**: `application/json`
-- **Secret**: the value of `GITHUB_WEBHOOK_SECRET` in `service/.env`
-- **Events**: `Pull requests` (subscribe to at least `opened`, `synchronize`, `reopened`, `ready_for_review`)
+| Setting | Value |
+| --- | --- |
+| **Payload URL** | `https://<your-tunnel>/webhooks/github` or `https://<host>:3003/webhook` |
+| **Content type** | `application/json` |
+| **Secret** | Same string in GitHub App settings, `service/.env` → `GITHUB_WEBHOOK_SECRET`, and `coverage-service/.env` → `WEBHOOK_SECRET` |
+| **Events** | `Pull requests` (`opened`, `synchronize`, `reopened`, `ready_for_review`) and `Installation` (so coverage-service stores per-repo installation IDs) |
 
-OpenReview will then enqueue a `review-fast` job (posts the inline review) **and** a `coverage-analysis` job (runs the pipeline above) on every PR. The two paths are equivalent; the curl path just lets you trigger on repos that aren't webhook-configured.
+Both `POST /webhook` and `POST /webhooks/github` are accepted on OpenReview — use whichever matches your GitHub App configuration.
+
+On each qualifying `pull_request` event, OpenReview enqueues:
+
+- `review-fast` — gitar-style summary + inline findings (cached when the reviewable diff matches a prior run; see `REVIEW_CACHE_ENABLED` in `service/.env.example`)
+- `coverage-analysis` — calls coverage-service, then opens the stacked test PR and posts the coverage comment
+
+**Ignored by design:** `edited` (e.g. CodeRabbit updating the PR body), `closed`, and other non-code events return `200` with `ignored` — push a new commit or redeliver an `opened`/`synchronize` delivery to re-run.
+
+The curl path in the previous section remains supported for repos without a webhook.
 
 ### `GET /pr-runs/:id` — response fields OpenReview consumes
 
@@ -370,10 +414,14 @@ OpenReview will then enqueue a `review-fast` job (posts the inline review) **and
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
+| Comments appear under your personal account, not the bot | OpenReview is using `GITHUB_AUTH_MODE=pat` (or `GITHUB_PAT` only) | Set `GITHUB_AUTH_MODE=app` with `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` in `service/.env`; restart the worker |
+| Webhook delivery `200` but `action edited ignored` | PR description was edited (e.g. by another bot), not new code | Push a commit (`synchronize`) or redeliver the `opened` webhook; only `opened` / `synchronize` / `reopened` / `ready_for_review` trigger runs |
+| Nothing hits OpenReview web logs; coverage API logs webhooks instead | Tunnel or GitHub App webhook points at `:3010` instead of `:3003` | `ngrok http 3003` and set Payload URL to `https://<tunnel>/webhooks/github` |
 | `Cannot POST /repositories/.../analyze` (HTML 404) | Hitting the wrong port — coverage-service is on `:3010`, OpenReview on `:3003`. | Use the right port. Confirm with `lsof -iTCP:3010 -sTCP:LISTEN`. |
+| `No GitHub App installation ID found for owner/repo` on `POST .../analyze` | Repo not linked to an app installation in the coverage DB | Install the app on the repo; ensure `installation` events reach OpenReview (forwarded to coverage-service), or set `GITHUB_APP_INSTALLATION_ID` |
 | `Repository not found` on analyze | Wrong `repo-id`. `GET /repositories` returns every registered repo — pick the row with the matching `githubRepo`. | Pipe `POST /repositories` straight into the analyze call (see Step 1 above); avoids retyping the cuid. |
-| `GitHub API access forbidden (403) for /git/blobs` | PAT has `pull-requests: write` but not `contents: write`. | Update the fine-grained PAT to **Contents: read & write** (or switch to a classic PAT with `repo`). |
-| `GitHub API access denied for owner/repo` (401) on analyze | PAT was rotated and `coverage-service/.env` still has the old string. | Same token must be in all three `.env` files. `grep -H GITHUB_PAT .env service/.env coverage-service/.env`. |
+| `GitHub API access forbidden (403) for /git/blobs` | PAT has `pull-requests: write` but not `contents: write`. | Update the fine-grained PAT to **Contents: read & write** (or switch to a classic PAT with `repo`, or use GitHub App auth). |
+| `GitHub API access denied for owner/repo` (401) on analyze | PAT was rotated and `coverage-service/.env` still has the old string. | Same token must be in all three `.env` files when using PAT mode. With App auth, verify `GITHUB_APP_PRIVATE_KEY` is correct. |
 | `ModuleNotFoundError: No module named 'diff_cover'` in the coverage worker | The Python venv wasn't created. | `pnpm coverage:setup:worker-deps` (creates `coverage-service/worker/.venv-tools/`). |
 | `Custom Id cannot contain :` from BullMQ | Stale jobId format from a pre-fix build. | `pnpm build && pnpm --filter @openreview/service start:worker` to pick up the new code. |
 | `status: "duplicate"` on `/coverage-runs/trigger` | A job for the same head SHA was already enqueued (and possibly failed). | `redis-cli del 'bull:openreview:coverage-analysis~<owner>/<repo>#<N>@<sha>'` to drop it, then re-trigger. Or push a new commit to bump the head SHA. |
@@ -381,8 +429,8 @@ OpenReview will then enqueue a `review-fast` job (posts the inline review) **and
 
 ### Configuration reference
 
-- All `COVERAGE_SERVICE_*` settings (timeouts, branch prefix, default coverage/test/install commands) live in [`service/.env.example`](service/.env.example).
-- Coverage-service's own settings (DB, Redis, LLM provider, `TEST_THRESHOLD`, `MAX_GENERATION_ATTEMPTS`, `DIFF_COVER_BIN`, worker concurrency) live in [`coverage-service/.env.example`](coverage-service/.env.example).
+- OpenReview service settings (webhook secret, **GitHub App auth**, review cache, `COVERAGE_SERVICE_*` timeouts and branch prefix) live in [`service/.env.example`](service/.env.example).
+- Coverage-service settings (DB, Redis, LLM provider, `WEBHOOK_SECRET`, `GITHUB_AUTH_MODE`, `TEST_THRESHOLD`, `MAX_GENERATION_ATTEMPTS`, `DIFF_COVER_BIN`, worker concurrency) live in [`coverage-service/.env.example`](coverage-service/.env.example).
 
 ## Instruction Files
 

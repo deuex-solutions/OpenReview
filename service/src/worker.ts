@@ -4,7 +4,7 @@ import type { Job } from 'bullmq';
 
 
 import { assertConfigReady, loadServiceConfig } from './config.js';
-import { createPatAuth } from './github/auth.js';
+import { createGitHubAuth } from './github/auth.js';
 import { createRedisConnection } from './jobs/connection.js';
 import { processChat } from './jobs/processors/chat.js';
 import { processCoverageAnalysis } from './jobs/processors/coverage-analysis.js';
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const auth = createPatAuth(cfg);
+  const auth = createGitHubAuth(cfg);
   const connection = createRedisConnection(cfg);
   const reviewCache = new ReviewCache(connection, cfg, logger);
 

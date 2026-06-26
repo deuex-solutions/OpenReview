@@ -52,7 +52,14 @@ const ConfigSchema = z.object({
 
   // GitHub
   githubWebhookSecret: stringOrEmpty,
+  githubAuthMode: z
+    .enum(['pat', 'app'])
+    .optional()
+    .transform((raw) => raw ?? 'pat'),
   githubPat: stringOrEmpty,
+  githubAppId: stringOrEmpty,
+  githubAppPrivateKey: stringOrEmpty,
+  githubAppInstallationId: stringOrEmpty,
 
   // Redis / queue
   redisUrl: stringOrEmpty,
@@ -111,7 +118,11 @@ export function loadServiceConfig(): ServiceConfig {
     maxPayloadBytes: process.env.MAX_PAYLOAD_BYTES,
 
     githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET,
+    githubAuthMode: process.env.GITHUB_AUTH_MODE as 'pat' | 'app' | undefined,
     githubPat: process.env.GITHUB_PAT || process.env.GITHUB_TOKEN,
+    githubAppId: process.env.GITHUB_APP_ID,
+    githubAppPrivateKey: process.env.GITHUB_APP_PRIVATE_KEY,
+    githubAppInstallationId: process.env.GITHUB_APP_INSTALLATION_ID,
 
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     workerConcurrency: process.env.WORKER_CONCURRENCY,
@@ -151,7 +162,12 @@ export function assertConfigReady(cfg: ServiceConfig): void {
   const missing: string[] = [];
 
   if (!cfg.githubWebhookSecret) missing.push('GITHUB_WEBHOOK_SECRET');
-  if (!cfg.githubPat) missing.push('GITHUB_PAT (or GITHUB_TOKEN)');
+  if (cfg.githubAuthMode === 'app') {
+    if (!cfg.githubAppId) missing.push('GITHUB_APP_ID');
+    if (!cfg.githubAppPrivateKey) missing.push('GITHUB_APP_PRIVATE_KEY');
+  } else if (!cfg.githubPat) {
+    missing.push('GITHUB_PAT (or GITHUB_TOKEN)');
+  }
   if (!cfg.redisUrl) missing.push('REDIS_URL');
 
   if (cfg.coverageServiceEnabled) {

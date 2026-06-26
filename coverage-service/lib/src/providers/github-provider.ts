@@ -24,42 +24,54 @@ export interface GitHubProviderConfig {
   pat?: string;
   appId?: string;
   privateKey?: string;
+  /** Static installation ID (single-org / Option A). Takes priority over the resolver. */
   installationId?: string;
+  /**
+   * Dynamic resolver for multi-tenant GitHub App (Option C).
+   * Called with the `owner/repo` string and must return the installation ID
+   * for that specific repo, or null if unknown.
+   */
+  resolveInstallationId?: (githubRepo: string) => Promise<string | null>;
 }
 
 export class GitHubProvider implements RepositoryProvider {
   readonly name = 'github';
-  private octokit: Octokit | null = null;
 
   constructor(private readonly config: GitHubProviderConfig) {}
 
-  private async getOctokit(): Promise<Octokit> {
-    if (this.octokit) return this.octokit;
+  private async resolveId(githubRepo?: string): Promise<string> {
+    // Static ID wins — keeps Option A working with zero changes.
+    if (this.config.installationId) return this.config.installationId;
 
+    if (this.config.resolveInstallationId && githubRepo) {
+      const id = await this.config.resolveInstallationId(githubRepo);
+      if (id) return id;
+    }
+
+    throw new Error(
+      `No GitHub App installation ID found for ${githubRepo ?? 'unknown repo'}. ` +
+      'Install the app on this repo or set GITHUB_APP_INSTALLATION_ID.',
+    );
+  }
+
+  private async getOctokit(githubRepo?: string): Promise<Octokit> {
     if (this.config.authMode === 'app') {
-      if (
-        !this.config.appId ||
-        !this.config.privateKey ||
-        !this.config.installationId
-      ) {
-        throw new Error(
-          'GitHub App auth requires appId, privateKey, and installationId',
-        );
+      if (!this.config.appId || !this.config.privateKey) {
+        throw new Error('GitHub App auth requires appId and privateKey');
       }
+      const installationId = parseInt(await this.resolveId(githubRepo), 10);
       const auth = createAppAuth({
         appId: this.config.appId,
         privateKey: this.config.privateKey.replace(/\\n/g, '\n'),
-        installationId: parseInt(this.config.installationId, 10),
+        installationId,
       });
-      this.octokit = new Octokit({ auth: (await auth({ type: 'installation' })).token });
-    } else {
-      if (!this.config.pat) {
-        throw new Error('PAT auth requires GITHUB_PAT');
-      }
-      this.octokit = new Octokit({ auth: this.config.pat });
+      return new Octokit({ auth: (await auth({ type: 'installation' })).token });
     }
 
-    return this.octokit;
+    if (!this.config.pat) {
+      throw new Error('PAT auth requires GITHUB_PAT');
+    }
+    return new Octokit({ auth: this.config.pat });
   }
 
   private async getCloneUrl(repoUrl: string): Promise<string> {
@@ -70,18 +82,22 @@ export class GitHubProvider implements RepositoryProvider {
       return url.toString();
     }
 
-    const octokit = await this.getOctokit();
     const match = repoUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
     if (!match) return repoUrl;
 
-    const [owner, repo] = match[1].split('/');
-    const { data } = await octokit.rest.apps.createInstallationAccessToken({
-      installation_id: parseInt(this.config.installationId!, 10),
-    });
+    const githubRepo = match[1]; // 'owner/repo'
+    const installationId = parseInt(await this.resolveId(githubRepo), 10);
 
-    const url = new URL(`https://github.com/${owner}/${repo}.git`);
+    const auth = createAppAuth({
+      appId: this.config.appId!,
+      privateKey: this.config.privateKey!.replace(/\\n/g, '\n'),
+      installationId,
+    });
+    const { token } = await auth({ type: 'installation' });
+
+    const url = new URL(`https://github.com/${githubRepo}.git`);
     url.username = 'x-access-token';
-    url.password = data.token;
+    url.password = token;
     return url.toString();
   }
 
@@ -96,7 +112,7 @@ export class GitHubProvider implements RepositoryProvider {
     baseBranch: string;
   }> {
     const [owner, repo] = githubRepo.split('/');
-    const octokit = await this.getOctokit();
+    const octokit = await this.getOctokit(githubRepo);
     const { data } = await octokit.rest.pulls.get({
       owner,
       repo,

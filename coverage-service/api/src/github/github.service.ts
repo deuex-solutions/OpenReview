@@ -6,18 +6,22 @@ import {
 import type { GitHubAuthMode} from '@openreview/coverage-lib';
 import { GitHubProvider } from '@openreview/coverage-lib';
 
+import { RepositoriesService } from '../repositories/repositories.service';
+
 @Injectable()
 export class GitHubService {
   private readonly provider: GitHubProvider;
 
-  constructor() {
+  constructor(private readonly repositories: RepositoriesService) {
     const authMode = (process.env.GITHUB_AUTH_MODE ?? 'pat') as GitHubAuthMode;
     this.provider = new GitHubProvider({
       authMode,
       pat: process.env.GITHUB_PAT,
       appId: process.env.GITHUB_APP_ID,
       privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
-      installationId: process.env.GITHUB_APP_INSTALLATION_ID,
+      installationId: process.env.GITHUB_APP_INSTALLATION_ID || undefined,
+      resolveInstallationId: (githubRepo) =>
+        this.repositories.resolveInstallationId(githubRepo),
     });
   }
 

@@ -8,15 +8,16 @@ datasource db {
 }
 
 model Repository {
-  id              String          @id @default(cuid())
-  githubRepo      String          @unique
-  defaultBranch   String          @default("main")
-  coverageCommand String          @default("npm test -- --coverage")
-  testCommand     String          @default("npm test")
-  installCommand  String          @default("")
-  createdAt       DateTime        @default(now())
-  pullRequestRuns PullRequestRun[]
-  testGenerationRuns TestGenerationRun[]
+  id                   String          @id @default(cuid())
+  githubRepo           String          @unique
+  defaultBranch        String          @default("main")
+  coverageCommand      String          @default("npm test -- --coverage")
+  testCommand          String          @default("npm test")
+  installCommand       String          @default("")
+  githubInstallationId String?         // set automatically when app is installed via webhook
+  createdAt            DateTime        @default(now())
+  pullRequestRuns      PullRequestRun[]
+  testGenerationRuns   TestGenerationRun[]
 }
 
 enum PrRunStatus {

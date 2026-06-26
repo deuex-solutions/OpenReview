@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 import { assertConfigReady, loadServiceConfig } from './config.js';
 import { createNoopDispatcher } from './dispatch/downstream.js';
-import { createPatAuth } from './github/auth.js';
+import { createGitHubAuth } from './github/auth.js';
 import { createRedisConnection } from './jobs/connection.js';
 import { ReviewQueue } from './jobs/queue.js';
 import { createLogger } from './logger.js';
@@ -24,7 +24,7 @@ async function main(): Promise<void> {
   const redis = createRedisConnection(cfg);
   const queue = new ReviewQueue(redis, cfg, logger);
   const downstream = createNoopDispatcher(logger);
-  const auth = createPatAuth(cfg);
+  const auth = createGitHubAuth(cfg);
 
   const app = createApp({ cfg, logger, redis, queue, downstream, auth });
 

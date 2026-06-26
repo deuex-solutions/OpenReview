@@ -14,6 +14,8 @@
     "dev:worker": "node --watch --import tsx src/worker.ts"
   },
   "dependencies": {
+    "@octokit/auth-app": "^7.1.4",
+    "@octokit/rest": "^21.0.2",
     "@openreview/core": "workspace:*",
     "bullmq": "^5.34.0",
     "dotenv": "^17.3.1",

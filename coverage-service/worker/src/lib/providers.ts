@@ -6,14 +6,28 @@ import {
   GitHubProvider
 } from '@openreview/coverage-lib';
 
+import { prisma } from './prisma';
+
 export function createRepositoryProvider() {
   const authMode = (process.env.GITHUB_AUTH_MODE ?? 'pat') as GitHubAuthMode;
+
   return new GitHubProvider({
     authMode,
     pat: process.env.GITHUB_PAT,
     appId: process.env.GITHUB_APP_ID,
     privateKey: process.env.GITHUB_APP_PRIVATE_KEY,
-    installationId: process.env.GITHUB_APP_INSTALLATION_ID,
+    // Static ID: set when running in single-org mode (Option A).
+    // Leave blank in multi-tenant mode (Option C) — the resolver below takes over.
+    installationId: process.env.GITHUB_APP_INSTALLATION_ID || undefined,
+    // Dynamic resolver: looks up the installation ID per-repo from the database.
+    // Only invoked when authMode === 'app' and no static installationId is set.
+    resolveInstallationId: async (githubRepo: string) => {
+      const repo = await prisma.repository.findFirst({
+        where: { githubRepo },
+        select: { githubInstallationId: true },
+      });
+      return repo?.githubInstallationId ?? null;
+    },
   });
 }
 

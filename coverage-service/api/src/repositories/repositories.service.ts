@@ -56,4 +56,37 @@ export class RepositoriesService {
       where: { githubRepo },
     });
   }
+
+  /**
+   * Called by the installation webhook handler to store (or clear) the
+   * GitHub App installation ID for a given repo. Creates the repo record
+   * automatically when the app is installed on a new repo that has not yet
+   * been manually registered.
+   */
+  async upsertByGithubRepo(
+    githubRepo: string,
+    installationId: string | null,
+  ) {
+    return this.prisma.repository.upsert({
+      where: { githubRepo },
+      update: { githubInstallationId: installationId },
+      create: {
+        githubRepo,
+        githubInstallationId: installationId,
+      },
+    });
+  }
+
+  /**
+   * Resolves the installation ID for a given repo — used by the worker
+   * so each repo authenticates with its own installation token.
+   */
+  async resolveInstallationId(githubRepo: string): Promise<string | null> {
+    const repo = await this.prisma.repository.findFirst({
+      where: { githubRepo },
+      select: { githubInstallationId: true },
+    });
+    return repo?.githubInstallationId ?? null;
+  }
 }
+
