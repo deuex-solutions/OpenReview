@@ -2,6 +2,8 @@ import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
+import { findJsPackageRoots } from './repo-setup.js';
+
 const PYTHON_STDLIB = new Set([
   'abc',
   'argparse',
@@ -91,8 +93,8 @@ async function collectFromPyproject(repoDir: string): Promise<string[]> {
   return packages;
 }
 
-async function collectFromPackageJson(repoDir: string): Promise<string[]> {
-  const path = join(repoDir, 'package.json');
+async function collectFromPackageJson(packageDir: string): Promise<string[]> {
+  const path = join(packageDir, 'package.json');
   if (!existsSync(path)) return [];
 
   const pkg = JSON.parse(await readFile(path, 'utf-8')) as {
@@ -122,7 +124,13 @@ export async function collectRepoPackages(repoDir: string): Promise<string[]> {
   for (const source of [
     await collectFromRequirements(repoDir),
     await collectFromPyproject(repoDir),
-    await collectFromPackageJson(repoDir),
+    ...(await Promise.all(
+      findJsPackageRoots(repoDir).map((root) =>
+        collectFromPackageJson(
+          root === '.' ? repoDir : join(repoDir, root),
+        ),
+      ),
+    )),
   ]) {
     for (const pkg of source) add(pkg);
   }

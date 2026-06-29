@@ -51,6 +51,7 @@ model PullRequestRun {
   completedAt  DateTime?
   coverageResult CoverageResult?
   generatedTests GeneratedTestArtifact[]
+  coverageIterations CoverageIteration[]
   executionLogs  ExecutionLog[]
   llmUsage       LlmUsageRecord[]
 
@@ -110,17 +111,63 @@ model TestGenerationLog {
   createdAt DateTime          @default(now())
 }
 
+enum GeneratedTestStatus {
+  PENDING
+  PASSING
+  FAILED
+}
+
+model CoverageIteration {
+  id              String         @id @default(cuid())
+  prRunId         String
+  prRun           PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  iteration       Int
+  coverageBefore  Float
+  coverageAfter   Float?
+  coverageGain    Float?
+  generatedTests  Int            @default(0)
+  failedTests     Int            @default(0)
+  stopReason      String?
+  createdAt       DateTime       @default(now())
+  gaps            CoverageGap[]
+  testArtifacts   GeneratedTestArtifact[]
+
+  @@unique([prRunId, iteration])
+  @@index([prRunId])
+}
+
+model CoverageGap {
+  id           String            @id @default(cuid())
+  iterationId  String
+  iteration    CoverageIteration @relation(fields: [iterationId], references: [id], onDelete: Cascade)
+  filePath     String
+  coverage     Float
+  missingLines Int[]
+  priority     Float
+  createdAt    DateTime          @default(now())
+
+  @@index([iterationId])
+}
+
 model GeneratedTestArtifact {
-  id                  String             @id @default(cuid())
-  prRunId             String?
-  prRun               PullRequestRun?    @relation(fields: [prRunId], references: [id], onDelete: Cascade)
-  testGenerationRunId String?            @unique
-  testGenerationRun   TestGenerationRun? @relation(fields: [testGenerationRunId], references: [id], onDelete: Cascade)
-  filePath            String
-  targetFile          String
-  content             String             @db.Text
-  passed              Boolean?
-  createdAt           DateTime           @default(now())
+  id                    String             @id @default(cuid())
+  prRunId               String?
+  prRun                 PullRequestRun?    @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  coverageIterationId   String?
+  coverageIteration     CoverageIteration? @relation(fields: [coverageIterationId], references: [id], onDelete: SetNull)
+  testGenerationRunId   String?            @unique
+  testGenerationRun     TestGenerationRun? @relation(fields: [testGenerationRunId], references: [id], onDelete: Cascade)
+  filePath              String
+  targetFile            String
+  content               String             @db.Text
+  passed                Boolean?
+  status                GeneratedTestStatus @default(PENDING)
+  repairAttempts        Int                @default(0)
+  coverageContribution  Float?
+  failureReason         String?            @db.Text
+  createdAt             DateTime           @default(now())
+
+  @@index([coverageIterationId])
 }
 
 model ExecutionLog {

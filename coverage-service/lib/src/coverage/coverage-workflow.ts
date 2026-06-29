@@ -11,8 +11,10 @@ import type {
   FileCoverage,
   UncoveredLine,
 } from '../types';
+import type { CoverageProvider } from '../providers/coverage-provider';
 
-import { pathsMatch } from './cobertura-parser';
+import { parseCoberturaXml, pathsMatch } from './cobertura-parser';
+import { computeDiffCoverageFromGit } from './git-diff-coverage';
 
 export function getEffectiveCoverage(
   diffCoverage: number | null,
@@ -78,6 +80,17 @@ export function selectFilesForGeneration(
   const thresholded = applyCoverageThreshold(report, thresholdPercent);
 
   if (thresholded.filesWithPoorCoverage.length === 0) {
+    const effective = getEffectiveCoverage(
+      report.diffCoveragePercent,
+      report.totalCoveragePercent,
+    );
+    if (
+      sourceFiles.length > 0 &&
+      report.fileCoverage.length === 0 &&
+      !meetsThreshold(effective, thresholdPercent)
+    ) {
+      return sourceFiles;
+    }
     return [];
   }
 
@@ -85,6 +98,38 @@ export function selectFilesForGeneration(
     thresholded.filesWithPoorCoverage.some((poor) =>
       pathsMatch(f.path, poor),
     ),
+  );
+}
+
+/** Prefer diff-cover when Cobertura has data; fall back to git diff when it does not. */
+export async function resolveDiffCoverageReport(params: {
+  coverageXmlPath: string;
+  repoDir: string;
+  compareRef: string;
+  headBranch: string;
+  targetFiles: string[];
+  thresholdPercent: number;
+  coverageProvider: CoverageProvider;
+}): Promise<DiffCoverageReport> {
+  const cobertura = params.coverageXmlPath
+    ? await parseCoberturaXml(params.coverageXmlPath)
+    : { totalCoveragePercent: 0, files: [] };
+
+  if (cobertura.files.length === 0 && params.targetFiles.length > 0) {
+    return computeDiffCoverageFromGit(
+      params.coverageXmlPath,
+      params.repoDir,
+      params.compareRef,
+      params.headBranch,
+      params.targetFiles,
+      params.thresholdPercent,
+    );
+  }
+
+  return params.coverageProvider.runDiffCoverage(
+    params.coverageXmlPath,
+    params.compareRef,
+    params.repoDir,
   );
 }
 
@@ -314,6 +359,8 @@ export function buildWorkflowSummary(params: {
   coverageBefore: BaselineMetrics;
   coverageAfter: BaselineMetrics;
   blockers: CoverageBlockerEntry[];
+  optimizationIterations?: CoverageWorkflowSummary['optimizationIterations'];
+  stopReason?: string | null;
 }): CoverageWorkflowSummary {
   const testsPassing = params.generatedTests.filter((t) => t.passed === true)
     .length;
@@ -334,5 +381,7 @@ export function buildWorkflowSummary(params: {
       params.coverageAfter.diffCoverage,
       params.coverageAfter.overallCoverage,
     ),
+    optimizationIterations: params.optimizationIterations,
+    stopReason: params.stopReason,
   };
 }

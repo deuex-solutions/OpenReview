@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { join, relative } from 'path';
 
 import { sourceFileExtension, type ChangedFile, type RepositoryProvider } from '@openreview/coverage-lib';
@@ -28,6 +28,31 @@ function shellQuote(value: string): string {
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
+}
+
+/** Escape glob metacharacters so c8/node --test match literal paths (e.g. [matchId] routes). */
+export function escapeGlobPathForC8(path: string): string {
+  return normalizePath(path)
+    .split('/')
+    .map((segment) =>
+      [...segment]
+        .map((char) => (char === '[' ? '[[]' : char === ']' ? '[]]' : char))
+        .join(''),
+    )
+    .join('/');
+}
+
+/** Write tsx/CSS loader hooks before running coverage or tests (avoids sh -c setup chains). */
+export function prepareJsTestHarness(
+  repoDir: string,
+  sourcePaths: string[],
+  testPaths: string[],
+): void {
+  const runtimePaths = [...testPaths, ...sourcePaths];
+  if (!needsRuntimeRegister(runtimePaths)) return;
+
+  writeFileSync(join(repoDir, TEST_REGISTER_PATH), TEST_REGISTER_CONTENT);
+  writeFileSync(join(repoDir, TEST_LOADER_PATH), TEST_LOADER_CONTENT);
 }
 
 function isTestFile(path: string): boolean {
@@ -61,13 +86,8 @@ function needsRuntimeRegister(paths: string[]): boolean {
   return needsJsTranspileLoader(paths);
 }
 
-function runtimeRegisterSetupCommand(paths: string[]): string | null {
-  if (!needsRuntimeRegister(paths)) return null;
-  const body = [
-    `require('fs').writeFileSync(${JSON.stringify(TEST_REGISTER_PATH)}, ${JSON.stringify(TEST_REGISTER_CONTENT)})`,
-    `require('fs').writeFileSync(${JSON.stringify(TEST_LOADER_PATH)}, ${JSON.stringify(TEST_LOADER_CONTENT)})`,
-  ].join(';');
-  return `node -e ${shellQuote(body)}`;
+function runtimeRegisterSetupCommand(_paths: string[]): string | null {
+  return null;
 }
 
 function nodeLoaderPrefix(paths: string[]): string {
@@ -127,7 +147,7 @@ function buildRunTarget(
     const loader = nodeLoaderPrefix(runtimePaths);
     return withRuntimeRegister(
       runtimePaths,
-      `node ${loader}--test ${testPaths.map(shellQuote).join(' ')}`,
+      `node ${loader}--test ${testPaths.map((p) => shellQuote(escapeGlobPathForC8(p))).join(' ')}`,
     );
   }
 
@@ -140,7 +160,9 @@ function buildRunTarget(
 function coverageToolPrefix(sourcePaths: string[]): string {
   const includes =
     sourcePaths.length > 0
-      ? sourcePaths.map((p) => `--include=${shellQuote(normalizePath(p))}`)
+      ? sourcePaths.map(
+          (p) => `--include=${shellQuote(escapeGlobPathForC8(p))}`,
+        )
       : ["--include='**/*'"];
 
   // c8 uses V8 native coverage and works with ESM; nyc/istanbul often reports 0% for "type":"module" repos.

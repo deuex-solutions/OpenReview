@@ -60,7 +60,18 @@ export interface CoverageBlockerEntry {
 export type CoverageWorkflowStatus =
   | 'threshold_met'
   | 'success'
-  | 'threshold_not_reached';
+  | 'threshold_not_reached'
+  | 'plateau_reached';
+
+export interface CoverageIterationSummary {
+  iteration: number;
+  coverageBefore: number;
+  coverageAfter: number | null;
+  coverageGain: number | null;
+  generatedTests: number;
+  failedTests: number;
+  stopReason?: string | null;
+}
 
 export interface CoverageWorkflowSummary {
   status: CoverageWorkflowStatus;
@@ -75,6 +86,13 @@ export interface CoverageWorkflowSummary {
   blockers: CoverageBlockerEntry[];
   targetCoverage: number;
   currentCoverage: number;
+  optimizationIterations?: CoverageIterationSummary[];
+  stopReason?: string | null;
+}
+
+export enum GenerationMode {
+  NEW_TEST_FILE = 'NEW_TEST_FILE',
+  COVERAGE_GAP = 'COVERAGE_GAP',
 }
 
 export interface FileCoverage {
@@ -124,6 +142,20 @@ export interface TestGenerationContext {
   testOutputPath?: string;
   /** True when updating an existing test file instead of creating a new one. */
   isUpdatingExistingTest?: boolean;
+  /** Generation mode: full file or gap-targeted incremental tests. */
+  generationMode?: GenerationMode;
+  /** Previously generated test content for this target (avoid duplication). */
+  previousGeneratedTests?: string;
+  /** Coverage report excerpt for this file. */
+  coverageReport?: string;
+  /** True for config/prompt/schema export files requiring smoke tests. */
+  isConfigExportFile?: boolean;
+  /** True for complex service files (retry, LLM, HTTP, pagination). */
+  isComplexServiceFile?: boolean;
+  /** Similar test examples from the repository. */
+  similarTestExamples?: string;
+  /** Suggested export names for smoke tests. */
+  smokeTestExports?: string[];
 }
 
 export interface PrAnalysisJobData {

@@ -1,5 +1,5 @@
 import {  inferSourceImportPath, inferTestFilePath, sourceFileExtension } from '../test-paths';
-import type { TestGenerationContext } from '../types';
+import { GenerationMode, type TestGenerationContext } from '../types';
 
 function formatRepoPackages(packages: string[]): string {
   if (packages.length === 0) return '(none detected)';
@@ -46,6 +46,29 @@ function formatTestCountGuidance(ctx: TestGenerationContext): string {
 function formatTestOutputMode(ctx: TestGenerationContext): string {
   const path = outputTestPath(ctx);
   const countGuidance = formatTestCountGuidance(ctx);
+
+  if (ctx.generationMode === GenerationMode.COVERAGE_GAP) {
+    return `## Mode: COVERAGE GAP — append incremental tests
+- Output path: \`${path}\`
+- DO NOT rewrite existing tests in Existing Tests or Previous Generated Tests.
+- DO NOT duplicate test names or behaviors already present.
+- Generate ONLY additional test cases that execute these uncovered diff lines: ${ctx.uncoveredLines}
+- Reuse existing mocks and fixtures from Existing Tests.
+- Return the **complete updated test file** (all existing + new tests only).`;
+  }
+
+  if (ctx.isConfigExportFile) {
+    return `## Mode: CONFIG / PROMPT EXPORT smoke tests
+- Output path: \`${path}\`
+- This file exports constants, prompts, schemas, or configuration — never skip it.
+- Write lightweight smoke tests that import exported symbols and assert basic invariants:
+  - String prompts contain expected keywords (e.g. expect(SYSTEM_PROMPT).toContain("extract"))
+  - Schemas/objects have expected keys or non-zero length
+  - Constants are defined and non-empty
+- Suggested exports to test: ${ctx.smokeTestExports?.join(', ') || '(detect from source)'}
+- Do NOT call external APIs.`;
+  }
+
   if (ctx.isUpdatingExistingTest) {
     return `## Mode: UPDATE existing test file
 - Output path: \`${path}\` (this file already exists — do NOT create a new file elsewhere).
@@ -59,6 +82,39 @@ ${countGuidance}
 ${countGuidance}`;
 }
 
+function formatComplexServiceSection(ctx: TestGenerationContext): string {
+  if (!ctx.isComplexServiceFile) return '';
+
+  return `## Complex service file (mandatory)
+This file contains retry logic, provider abstractions, LLM calls, HTTP clients, pagination, or chunking.
+
+Requirements:
+- Mock ALL external services — never call real APIs or LLMs.
+- Verify retry/backoff behavior with controlled mock failures.
+- Verify pagination/chunking processes all items.
+- Verify fallback logic when primary provider fails.
+- Include dependency interfaces and mock at the import boundary used by production code.
+${ctx.similarTestExamples ? `\nSimilar repository tests (follow these patterns):\n${ctx.similarTestExamples}` : ''}
+
+`;
+}
+
+function formatPreviousGeneratedSection(ctx: TestGenerationContext): string {
+  if (!ctx.previousGeneratedTests?.trim()) return '';
+  return `Previous Generated Tests (do NOT duplicate):
+${ctx.previousGeneratedTests}
+
+`;
+}
+
+function formatCoverageReportSection(ctx: TestGenerationContext): string {
+  if (!ctx.coverageReport?.trim()) return '';
+  return `Coverage Report (this file):
+${ctx.coverageReport}
+
+`;
+}
+
 function buildPythonPrompt(ctx: TestGenerationContext, symbols: string): string {
   return `You are writing Python unit tests for ONE production file. Tests must pass on first run with no manual fixes.
 
@@ -67,7 +123,7 @@ function buildPythonPrompt(ctx: TestGenerationContext, symbols: string): string 
 ${formatTestOutputMode(ctx)}
 - Test the file: ${ctx.file}
 
-${formatFullSourceHeader(ctx)}## Context
+${formatFullSourceHeader(ctx)}${formatComplexServiceSection(ctx)}## Context
 
 Repository Language: ${ctx.language}
 Testing Framework: ${ctx.framework}
@@ -84,7 +140,7 @@ ${ctx.source}
 Existing Tests:
 ${ctx.existingTests || '(none found)'}
 
-Uncovered Changed Lines:
+${formatPreviousGeneratedSection(ctx)}${formatCoverageReportSection(ctx)}Uncovered Changed Lines:
 ${ctx.uncoveredLines}
 
 All Symbols in File:
@@ -206,7 +262,7 @@ Do NOT use @jest/globals, jest, vitest, mocha, describe, it, expect, or jest.fn.
 ${formatTestOutputMode(ctx)}
 - Production file: ${ctx.file}
 
-${formatFullSourceHeader(ctx)}## Context
+${formatFullSourceHeader(ctx)}${formatComplexServiceSection(ctx)}## Context
 
 Repository Language: ${ctx.language}
 Testing Framework: ${ctx.framework}
@@ -226,7 +282,7 @@ ${formatExportedSymbols(ctx)}
 Existing Tests:
 ${ctx.existingTests || '(none found)'}
 
-Uncovered Changed Lines:
+${formatPreviousGeneratedSection(ctx)}${formatCoverageReportSection(ctx)}Uncovered Changed Lines:
 ${ctx.uncoveredLines}
 
 All Symbols in File:
@@ -296,7 +352,7 @@ function buildRepairSection(ctx: TestGenerationContext): string {
   return `
 
 ## Repair (attempt ${ctx.attemptNumber ?? 2})
-The previous generated test failed when executed. Fix the test file so it compiles, runs, and passes.
+The generated test failed when executed. Modify ONLY the failing test — do not rewrite unrelated tests.
 
 Failure output:
 ${ctx.failureLogs}

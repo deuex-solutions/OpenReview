@@ -18,6 +18,7 @@ import {
   parseCoberturaXml,
   applyCoverageThreshold,
   pickTargetFileForTestGeneration,
+  resolveDiffCoverageReport,
   getTestThresholdPercent,
   pathsMatch,
   prepareTestFileContext,
@@ -27,6 +28,7 @@ import type { Job } from 'bullmq';
 import {
   buildJsCoverageCommand,
   collectJsTestPaths,
+  prepareJsTestHarness,
 } from '../lib/js-coverage';
 import { prisma } from '../lib/prisma';
 import {
@@ -43,7 +45,7 @@ import {
   collectRepoPackages,
   parseGeneratedTestContent,
 } from '../lib/repo-packages';
-import { detectRepoSetup, setupPythonRepo } from '../lib/repo-setup';
+import { detectRepoSetup, setupPythonRepo, hasJsSourcePaths } from '../lib/repo-setup';
 import { cleanupDir, findCoverageXml, runCommand } from '../lib/shell';
 
 export class TestGenerationProcessor {
@@ -312,10 +314,15 @@ export class TestGenerationProcessor {
     job?: Job<TestGenerationJobData>;
   }): Promise<DiffCoverageReport> {
     const sourcePaths = params.sourceFiles.map((f) => f.path);
-    const useCoveragePackageOnly = params.repoSetup.isPython;
-    const useAutoJsCoverage = params.repoSetup.isJavaScript;
+    const useCoveragePackageOnly =
+      params.repoSetup.isPython &&
+      params.sourceFiles.some((f) => f.path.endsWith('.py')) &&
+      !hasJsSourcePaths(sourcePaths);
+    const useAutoJsCoverage =
+      params.repoSetup.isJavaScript || hasJsSourcePaths(sourcePaths);
 
     let coverageCommand: string;
+    let jsTestPaths: string[] = [];
 
     if (useCoveragePackageOnly) {
       const pythonTestPaths = await collectPythonTestPaths(
@@ -328,7 +335,7 @@ export class TestGenerationProcessor {
         buildPythonCoverageCommand(sourcePaths, pythonTestPaths, params.runDir),
       );
     } else if (useAutoJsCoverage) {
-      const jsTestPaths = await collectJsTestPaths(
+      jsTestPaths = await collectJsTestPaths(
         params.runDir,
         params.changedFiles,
         sourcePaths,
@@ -362,6 +369,10 @@ export class TestGenerationProcessor {
       'info',
       `Coverage command: ${coverageCommand}`,
     );
+
+    if (useAutoJsCoverage) {
+      prepareJsTestHarness(params.runDir, sourcePaths, jsTestPaths);
+    }
 
     const result = await this.withProgressHeartbeat(
       params.runId,
@@ -423,11 +434,15 @@ export class TestGenerationProcessor {
           sourcePaths,
           this.testThresholdPercent,
         )
-      : await this.coverageProvider.runDiffCoverage(
-          coverageXml,
-          params.baseRef,
-          params.runDir,
-        );
+      : await resolveDiffCoverageReport({
+          coverageXmlPath: coverageXml,
+          repoDir: params.runDir,
+          compareRef: params.baseRef,
+          headBranch: params.headBranch,
+          targetFiles: sourcePaths,
+          thresholdPercent: this.testThresholdPercent,
+          coverageProvider: this.coverageProvider,
+        });
 
     return applyCoverageThreshold(report, this.testThresholdPercent);
   }

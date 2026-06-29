@@ -9,12 +9,91 @@ import {
   wrapWithVenvActivate,
 } from './python-venv';
 
+const JS_PACKAGE_DIR_CANDIDATES = [
+  '.',
+  'backend',
+  'frontend',
+  'web',
+  'client',
+  'server',
+  'app',
+  'packages/web',
+  'packages/app',
+];
+
 export interface RepoSetup {
   isPython: boolean;
   isJavaScript: boolean;
+  /** Repo-relative path containing package.json (e.g. "backend"), or "." at root. */
+  jsPackageRoot: string | null;
   venvDir: string | null;
   installCommand: string | null;
   wrapCommand: (command: string) => string;
+}
+
+export function hasJsSourcePaths(paths: string[]): boolean {
+  return paths.some((p) => /\.(ts|tsx|js|jsx|mjs|cjs)$/i.test(p));
+}
+
+export function findJsPackageRoot(repoDir: string): string | null {
+  for (const sub of JS_PACKAGE_DIR_CANDIDATES) {
+    const dir = sub === '.' ? repoDir : join(repoDir, sub);
+    if (existsSync(join(dir, 'package.json'))) {
+      return sub;
+    }
+  }
+  return null;
+}
+
+export function findJsPackageRoots(repoDir: string): string[] {
+  const roots: string[] = [];
+  for (const sub of JS_PACKAGE_DIR_CANDIDATES) {
+    const dir = sub === '.' ? repoDir : join(repoDir, sub);
+    if (existsSync(join(dir, 'package.json'))) {
+      roots.push(sub);
+    }
+  }
+  return roots;
+}
+
+export function defaultJsToolsInstallCommand(): string {
+  return 'npm install --no-save --legacy-peer-deps c8 check-code-coverage tsx';
+}
+
+function buildJsInstallCommand(repoDir: string, jsPackageRoot: string): string {
+  const jsCoverageDeps = 'c8 check-code-coverage tsx';
+  const pkgDir = jsPackageRoot === '.' ? repoDir : join(repoDir, jsPackageRoot);
+  const hasPackageLock = existsSync(join(pkgDir, 'package-lock.json'));
+  const hasYarnLock = existsSync(join(pkgDir, 'yarn.lock'));
+  const hasPnpmLock = existsSync(join(pkgDir, 'pnpm-lock.yaml'));
+
+  let pkgInstall: string;
+  if (jsPackageRoot === '.') {
+    if (hasPnpmLock) pkgInstall = 'pnpm install --frozen-lockfile';
+    else if (hasYarnLock) pkgInstall = 'yarn install --frozen-lockfile';
+    else if (hasPackageLock) pkgInstall = 'npm ci';
+    else pkgInstall = 'npm install';
+    return `${pkgInstall} && npm install --no-save --legacy-peer-deps ${jsCoverageDeps}`;
+  }
+
+  const cdPrefix = `(cd ${jsPackageRoot} && `;
+  if (hasPnpmLock) pkgInstall = `${cdPrefix}pnpm install --frozen-lockfile)`;
+  else if (hasYarnLock) pkgInstall = `${cdPrefix}yarn install --frozen-lockfile)`;
+  else if (hasPackageLock) pkgInstall = `${cdPrefix}npm ci)`;
+  else pkgInstall = `${cdPrefix}npm install)`;
+
+  return `${pkgInstall} && npm install --no-save --legacy-peer-deps ${jsCoverageDeps}`;
+}
+
+function buildJsRepoSetup(repoDir: string, jsPackageRoot: string): RepoSetup {
+  return {
+    isPython: false,
+    isJavaScript: true,
+    jsPackageRoot,
+    venvDir: null,
+    installCommand: buildJsInstallCommand(repoDir, jsPackageRoot),
+    wrapCommand: (cmd) => cmd,
+  };
 }
 
 export async function setupPythonRepo(
@@ -45,9 +124,11 @@ export function detectRepoSetup(repoDir: string): RepoSetup {
 
   const coverageDeps = 'coverage pytest pytest-asyncio';
   const jsCoverageDeps = 'c8 check-code-coverage tsx';
+  const jsPackageRoot = findJsPackageRoot(repoDir);
   const noVenv: RepoSetup = {
     isPython: false,
     isJavaScript: false,
+    jsPackageRoot: null,
     venvDir: null,
     installCommand: null,
     wrapCommand: (cmd) => cmd,
@@ -56,7 +137,8 @@ export function detectRepoSetup(repoDir: string): RepoSetup {
   if (hasUvLock) {
     return {
       isPython: true,
-      isJavaScript: false,
+      isJavaScript: jsPackageRoot !== null,
+      jsPackageRoot,
       venvDir: null,
       installCommand: [
         `UV_PROJECT_ENVIRONMENT=${PR_COVERAGE_VENV} uv sync --all-groups --all-extras`,
@@ -69,7 +151,8 @@ export function detectRepoSetup(repoDir: string): RepoSetup {
   if (hasPoetryLock) {
     return {
       isPython: true,
-      isJavaScript: false,
+      isJavaScript: jsPackageRoot !== null,
+      jsPackageRoot,
       venvDir: null,
       installCommand: [
         'POETRY_VIRTUALENVS_CREATE=false poetry install --no-interaction',
@@ -90,38 +173,31 @@ export function detectRepoSetup(repoDir: string): RepoSetup {
 
     return {
       isPython: true,
-      isJavaScript: false,
+      isJavaScript: jsPackageRoot !== null,
+      jsPackageRoot,
       venvDir: null,
       installCommand: installParts.join(' && '),
       wrapCommand: (cmd) => cmd,
     };
   }
 
-  const jsInstallBase = hasPackageLock ? 'npm ci' : 'npm install';
-  const jsInstallCommand = `${jsInstallBase} && npm install --no-save --legacy-peer-deps ${jsCoverageDeps}`;
-
   if (hasPnpmLock) {
-    return {
-      ...noVenv,
-      isJavaScript: true,
-      installCommand: `pnpm install --frozen-lockfile && pnpm add -D ${jsCoverageDeps}`,
-    };
+    return buildJsRepoSetup(repoDir, '.');
   }
 
   if (hasYarnLock) {
     return {
-      ...noVenv,
-      isJavaScript: true,
+      ...buildJsRepoSetup(repoDir, '.'),
       installCommand: `yarn install --frozen-lockfile && yarn add -D ${jsCoverageDeps}`,
     };
   }
 
   if (hasPackageLock || hasPackageJson) {
-    return {
-      ...noVenv,
-      isJavaScript: true,
-      installCommand: jsInstallCommand,
-    };
+    return buildJsRepoSetup(repoDir, '.');
+  }
+
+  if (jsPackageRoot) {
+    return buildJsRepoSetup(repoDir, jsPackageRoot);
   }
 
   return noVenv;

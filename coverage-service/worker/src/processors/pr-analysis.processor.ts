@@ -11,7 +11,8 @@ import type {
   CoverageWorkflowSummary,
   DiffCoverageReport,
   LlmUsage,
-  GitHubProvider} from '@openreview/coverage-lib';
+  GitHubProvider,
+} from '@openreview/coverage-lib';
 import {
   pathsMatch,
   detectFramework,
@@ -20,16 +21,21 @@ import {
   extractExportedSymbols,
   computeDiffCoverageFromGit,
   parseCoberturaXml,
-  getTestThresholdPercent,
+  getTargetDiffCoveragePercent,
   getMaxGenerationAttempts,
+  getMaxRepairAttempts,
   extractBaselineMetrics,
   getEffectiveCoverage,
   meetsThreshold,
   applyCoverageThreshold,
-  selectFilesForGeneration,
+  resolveDiffCoverageReport,
   classifyCoverageBlockers,
   buildWorkflowSummary,
   prepareTestFileContext,
+  isConfigOrPromptExportFile,
+  isComplexServiceFile,
+  suggestSmokeTestExports,
+  GenerationMode,
 } from '@openreview/coverage-lib';
 import type { Prisma } from '@prisma/client';
 import type { Job } from 'bullmq';
@@ -38,13 +44,13 @@ import {
   buildJsCoverageCommand,
   buildJsTestCommand,
   collectJsTestPaths,
+  prepareJsTestHarness,
 } from '../lib/js-coverage';
 import { prisma } from '../lib/prisma';
 import {
   createCoverageProviderFromEnv,
   createLLMProvider,
   createRepositoryProvider,
-  resolveTestGenerationModel,
 } from '../lib/providers';
 import {
   buildPythonCoverageCommand,
@@ -59,16 +65,24 @@ import {
   parseGeneratedTestContent,
 } from '../lib/repo-packages';
 import type { RepoSetup} from '../lib/repo-setup';
-import { detectRepoSetup, setupPythonRepo } from '../lib/repo-setup';
+import { detectRepoSetup, setupPythonRepo, hasJsSourcePaths, defaultJsToolsInstallCommand } from '../lib/repo-setup';
 import { cleanupDir, findCoverageXml, runCommand } from '../lib/shell';
+import {
+  CoverageOptimizationService,
+  type GenerateTestOutcome,
+} from '../lib/coverage-optimization-service';
+import { TestRepairService } from '../lib/test-repair-service';
 
 export class PrAnalysisProcessor {
   private readonly repoProvider = createRepositoryProvider();
   private readonly coverageProvider = createCoverageProviderFromEnv();
   private readonly llmProvider = createLLMProvider();
+  private readonly optimizationService = new CoverageOptimizationService();
+  private readonly testRepairService = new TestRepairService();
   private readonly workDir = process.env.WORK_DIR ?? '/tmp/pr-coverage-runs';
-  private readonly testThresholdPercent = getTestThresholdPercent();
+  private readonly testThresholdPercent = getTargetDiffCoveragePercent();
   private readonly maxGenerationAttempts = getMaxGenerationAttempts();
+  private readonly maxRepairAttempts = getMaxRepairAttempts();
   private activeJob?: Job<PrAnalysisJobData>;
 
   async process(
@@ -151,42 +165,6 @@ export class PrAnalysisProcessor {
         await this.log(data.prRunId, 'info', 'Python virtualenv ready');
       }
 
-      const rawInstallCommand =
-        repository.installCommand?.trim() || repoSetup.installCommand;
-      const installCommand = rawInstallCommand
-        ? repoSetup.wrapCommand(rawInstallCommand)
-        : null;
-      if (installCommand) {
-        await this.log(
-          data.prRunId,
-          'info',
-          `Installing dependencies: ${installCommand}`,
-        );
-        const installResult = await this.withProgressHeartbeat(
-          data.prRunId,
-          'Installing dependencies',
-          () => runCommand(installCommand, runDir),
-        );
-        if (installResult.exitCode !== 0) {
-          const output = `${installResult.stdout}\n${installResult.stderr}`.slice(
-            -2000,
-          );
-          throw new Error(
-            `Dependency install failed (exit ${installResult.exitCode}): ${output}`,
-          );
-        }
-        await this.log(data.prRunId, 'info', 'Dependencies installed successfully');
-      }
-
-      const repoPackages = await collectRepoPackages(runDir);
-      if (repoPackages.length > 0) {
-        await this.log(
-          data.prRunId,
-          'info',
-          `Repository packages: ${repoPackages.join(', ')}`,
-        );
-      }
-
       await this.updateStatus(data.prRunId, 'ANALYZING');
       await this.log(data.prRunId, 'info', 'Analyzing changed files in PR');
       const changedFiles = await this.repoProvider.getChangedFiles(
@@ -211,8 +189,52 @@ export class PrAnalysisProcessor {
       );
 
       const sourcePaths = sourceFiles.map((f) => f.path);
-      const useCoveragePackageOnly = repoSetup.isPython;
-      const useAutoJsCoverage = repoSetup.isJavaScript;
+      const hasJsSourceChanges = hasJsSourcePaths(sourcePaths);
+      const hasPySourceChanges = sourceFiles.some((f) => f.path.endsWith('.py'));
+      const useAutoJsCoverage = repoSetup.isJavaScript || hasJsSourceChanges;
+      const useCoveragePackageOnly =
+        repoSetup.isPython && hasPySourceChanges && !hasJsSourceChanges;
+
+      const rawInstallCommand =
+        repository.installCommand?.trim() || repoSetup.installCommand;
+      let installCommand = rawInstallCommand
+        ? repoSetup.wrapCommand(rawInstallCommand)
+        : null;
+      if (!installCommand && useAutoJsCoverage) {
+        installCommand = repoSetup.wrapCommand(
+          repoSetup.installCommand ?? defaultJsToolsInstallCommand(),
+        );
+      }
+      if (installCommand) {
+        await this.log(
+          data.prRunId,
+          'info',
+          `Installing dependencies: ${installCommand}`,
+        );
+        const installResult = await this.withProgressHeartbeat(
+          data.prRunId,
+          'Installing dependencies',
+          () => runCommand(installCommand!, runDir),
+        );
+        if (installResult.exitCode !== 0) {
+          const output = `${installResult.stdout}\n${installResult.stderr}`.slice(
+            -2000,
+          );
+          throw new Error(
+            `Dependency install failed (exit ${installResult.exitCode}): ${output}`,
+          );
+        }
+        await this.log(data.prRunId, 'info', 'Dependencies installed successfully');
+      }
+
+      const repoPackages = await collectRepoPackages(runDir);
+      if (repoPackages.length > 0) {
+        await this.log(
+          data.prRunId,
+          'info',
+          `Repository packages: ${repoPackages.join(', ')}`,
+        );
+      }
 
       let pythonTestPaths: string[] = [];
       let jsTestPaths: string[] = [];
@@ -280,6 +302,10 @@ export class PrAnalysisProcessor {
               ? `Running c8 coverage on ${sourcePaths.length} file(s): ${coverageCommand}`
               : `Running initial coverage: ${coverageCommand}`,
         );
+
+        if (useAutoJsCoverage) {
+          prepareJsTestHarness(runDir, sourcePaths, jsTestPaths);
+        }
 
         beforeCoverageResult = await this.withProgressHeartbeat(
           data.prRunId,
@@ -357,94 +383,144 @@ export class PrAnalysisProcessor {
         return;
       }
 
-      const filesNeedingTests = selectFilesForGeneration(
-        beforeCoverageResult.report,
-        sourceFiles,
-        this.testThresholdPercent,
-      ).slice(0, 10);
-
-      await this.log(
-        data.prRunId,
-        'info',
-        `${filesNeedingTests.length} file(s) with coverage gaps selected for test generation`,
-      );
-
-      const generatedTests: GeneratedTest[] = [];
-      const generatedTestResults: { filePath: string; passed: boolean | null }[] =
-        [];
-      const declaredTestDeps: string[] = [];
-      let totalGenerationAttempts = 0;
-
-      if (filesNeedingTests.length > 0 && this.hasLlmConfigured()) {
-        await this.updateStatus(data.prRunId, 'GENERATING_TESTS');
-        const llmProviderName = (process.env.LLM_PROVIDER ?? 'openai') as
-          | 'openai'
-          | 'anthropic'
-          | 'local';
+      if (this.hasLlmConfigured()) {
         await this.log(
           data.prRunId,
           'info',
-          `Test generation: ${llmProviderName} / ${resolveTestGenerationModel(llmProviderName)}`,
+          `Starting coverage optimization (target: ${this.testThresholdPercent}% diff coverage)`,
         );
+      }
 
-        for (const file of filesNeedingTests) {
-          const fileDiff =
-            beforeCoverageResult.report.fileCoverage.find((f) =>
-              pathsMatch(f.file, file.path),
-            )?.diffCoveragePercent ?? null;
-          await this.log(
-            data.prRunId,
-            'info',
-            `Generating tests for ${file.path} (diff coverage ${fileDiff ?? 'n/a'}%, full PR branch source)`,
-          );
-          try {
-            const framework = detectFramework(runDir, detectLanguage(file.path), testCommand);
-            const testCtx = await prepareTestFileContext(
-              this.repoProvider,
-              runDir,
-              file.path,
-              framework,
+      const optimizationResult = await this.optimizationService.run(
+        {
+          prRunId: data.prRunId,
+          runDir,
+          sourceFiles,
+          sourcePaths,
+          baseRef,
+          headBranch,
+          testCommand,
+          repoPackages,
+          useCoveragePackageOnly,
+          useAutoJsCoverage,
+          pythonTestPaths,
+          jsTestPaths,
+          hasLlm: this.hasLlmConfigured(),
+        },
+        beforeCoverageResult.report,
+        {
+          log: (level, message) => this.log(data.prRunId, level, message),
+          updateStatus: (status) =>
+            this.updateStatus(data.prRunId, status as PrRunStatus),
+          runCoverage: async (coverageCommand, _prevReport) => {
+            const result = await this.withProgressHeartbeat(
+              data.prRunId,
+              'Post-test coverage command running',
+              () =>
+                this.runCoverage(
+                  data.prRunId,
+                  runDir,
+                  coverageCommand,
+                  baseRef,
+                  headBranch,
+                  sourcePaths,
+                  useCoveragePackageOnly,
+                  logs,
+                ),
             );
-            if (testCtx.isUpdatingExistingTest) {
-              await this.log(
-                data.prRunId,
-                'info',
-                `Updating existing test file: ${testCtx.testOutputPath}`,
-              );
+            result.report = applyCoverageThreshold(
+              result.report,
+              this.testThresholdPercent,
+            );
+            return result;
+          },
+          buildPostCoverageCommand: (passingTestPaths) => {
+            const postTestPaths = useCoveragePackageOnly
+              ? passingTestPaths.length > 0
+                ? passingTestPaths
+                : pythonTestPaths
+              : useAutoJsCoverage
+                ? passingTestPaths.length > 0
+                  ? passingTestPaths
+                  : jsTestPaths
+                : passingTestPaths;
+            if (useAutoJsCoverage) {
+              prepareJsTestHarness(runDir, sourcePaths, postTestPaths);
             }
-
-            const outcome = await this.generateAndValidateTest({
+            return useCoveragePackageOnly
+              ? repoSetup.wrapCommand(
+                  buildPythonCoverageCommand(sourcePaths, postTestPaths, runDir),
+                )
+              : useAutoJsCoverage
+                ? repoSetup.wrapCommand(
+                    buildJsCoverageCommand(sourcePaths, postTestPaths, runDir),
+                  )
+                : repoSetup.wrapCommand(repository.coverageCommand);
+          },
+          generateTestForFile: async (file, report, options) =>
+            this.generateAndValidateTest({
               prRunId: data.prRunId,
               runDir,
               file,
               baseRef,
               headBranch,
               testCommand,
-              report: beforeCoverageResult.report,
+              report,
               repoPackages,
               repoSetup,
               sourcePaths,
               useCoveragePackageOnly,
               useAutoJsCoverage,
               logs,
-            });
-
-            totalGenerationAttempts += outcome.attempts;
-
-            if (outcome.test) {
-              generatedTests.push(outcome.test);
-              generatedTestResults.push({
-                filePath: outcome.test.filePath,
-                passed: outcome.passed,
+              generationMode: options.generationMode,
+              previousGeneratedContent: options.previousGeneratedContent,
+            }),
+          getSourceLineCount: async (filePath) => {
+            const content = await this.repoProvider.getFileContent(
+              runDir,
+              filePath,
+            );
+            return content ? content.split('\n').length : 0;
+          },
+          isConfigExportFile: async (filePath) => {
+            const content = await this.repoProvider.getFileContent(
+              runDir,
+              filePath,
+            );
+            return content ? isConfigOrPromptExportFile(content) : false;
+          },
+          installTestDeps: async (tests, declaredDeps) => {
+            if (repoSetup.isPython || repoSetup.isJavaScript) {
+              await this.installGeneratedTestDependencies({
+                prRunId: data.prRunId,
+                runDir,
+                repoSetup,
+                rawInstallCommand: rawInstallCommand,
+                generatedTests: tests,
+                declaredTestDeps: declaredDeps,
+                repoPackages,
+                logs,
               });
-              declaredTestDeps.push(...outcome.declaredDeps);
             }
-          } catch (err) {
-            const msg = `Test generation failed for ${file.path}: ${(err as Error).message}`;
-            logs.push(msg);
-            await this.log(data.prRunId, 'warn', msg);
-          }
-        }
+          },
+        },
+      );
+
+      const generatedTests = optimizationResult.generatedTests;
+      const generatedTestResults = optimizationResult.generatedTestResults;
+      const totalGenerationAttempts = optimizationResult.totalGenerationAttempts;
+      let afterCoverageResult = {
+        report: optimizationResult.afterReport,
+        coverageXml: beforeCoverageResult.coverageXml,
+      };
+
+      if (generatedTests.length > 0) {
+        await this.updateStatus(data.prRunId, 'RUNNING_TESTS');
+        await this.log(
+          data.prRunId,
+          'info',
+          `Optimization complete: ${generatedTestResults.filter((t) => t.passed).length} passing, ${generatedTestResults.filter((t) => !t.passed).length} failed`,
+        );
       } else if (!this.hasLlmConfigured()) {
         await this.log(
           data.prRunId,
@@ -454,56 +530,8 @@ export class PrAnalysisProcessor {
       }
 
       let executionStatus: 'PASS' | 'FAIL' | 'SKIPPED' | 'PARTIAL' = 'SKIPPED';
-      let afterCoverageResult = beforeCoverageResult;
 
-      if (generatedTests.length > 0) {
-        await this.updateStatus(data.prRunId, 'RUNNING_TESTS');
-
-        if (repoSetup.isPython || repoSetup.isJavaScript) {
-          await this.installGeneratedTestDependencies({
-            prRunId: data.prRunId,
-            runDir,
-            repoSetup,
-            rawInstallCommand,
-            generatedTests,
-            declaredTestDeps,
-            repoPackages,
-            logs,
-          });
-        }
-
-        if (!useCoveragePackageOnly && !useAutoJsCoverage) {
-          const runTestsCommand = repoSetup.wrapCommand(testCommand);
-          await this.log(
-            data.prRunId,
-            'info',
-            `Running generated tests: ${runTestsCommand}`,
-          );
-          const testResult = await runCommand(runTestsCommand, runDir);
-          logs.push(testResult.stdout, testResult.stderr);
-          const passed = testResult.exitCode === 0;
-
-          await prisma.generatedTestArtifact.updateMany({
-            where: { prRunId: data.prRunId },
-            data: { passed },
-          });
-
-          for (const entry of generatedTestResults) {
-            entry.passed = passed;
-          }
-
-          if (!passed) {
-            const output = `${testResult.stdout}\n${testResult.stderr}`.slice(
-              -2000,
-            );
-            await this.log(
-              data.prRunId,
-              'error',
-              `Generated tests failed execution (exit ${testResult.exitCode}): ${output}`,
-            );
-          }
-        }
-
+      if (generatedTestResults.length > 0) {
         const passingTests = generatedTestResults.filter((t) => t.passed).length;
         const failingTests = generatedTestResults.filter((t) => !t.passed).length;
 
@@ -520,59 +548,13 @@ export class PrAnalysisProcessor {
           `Generated test results: ${passingTests} passed, ${failingTests} failed`,
         );
 
-        const generatedTestPaths = generatedTests.map((t) => t.filePath);
-        await this.updateStatus(data.prRunId, 'RECALCULATING');
-        await this.log(
-          data.prRunId,
-          'info',
-          'Recalculating coverage after generated tests',
-        );
-
-        // Run only generated tests for post-coverage — pre-existing broken tests
-        // (e.g. src/**/__test__ with bad ESM imports) must not fail the recalc.
-        const postTestPaths = useCoveragePackageOnly
-          ? generatedTestPaths.length > 0
-            ? generatedTestPaths
-            : pythonTestPaths
-          : useAutoJsCoverage
-            ? generatedTestPaths.length > 0
-              ? generatedTestPaths
-              : jsTestPaths
-            : generatedTestPaths;
-        const postCoverageCommand = useCoveragePackageOnly
-          ? repoSetup.wrapCommand(
-              buildPythonCoverageCommand(sourcePaths, postTestPaths, runDir),
-            )
-          : useAutoJsCoverage
-            ? repoSetup.wrapCommand(
-                buildJsCoverageCommand(sourcePaths, postTestPaths, runDir),
-              )
-            : coverageCommand;
-
-        afterCoverageResult = await this.withProgressHeartbeat(
-          data.prRunId,
-          'Post-test coverage command running',
-          () =>
-            this.runCoverage(
-              data.prRunId,
-              runDir,
-              postCoverageCommand,
-              baseRef,
-              headBranch,
-              sourcePaths,
-              useCoveragePackageOnly,
-              logs,
-            ),
-        );
-        afterCoverageResult.report = applyCoverageThreshold(
-          afterCoverageResult.report,
-          this.testThresholdPercent,
-        );
-        await this.log(
-          data.prRunId,
-          'info',
-          `Final coverage: ${afterCoverageResult.report.totalCoveragePercent}% total, ${afterCoverageResult.report.diffCoveragePercent ?? 'n/a'}% diff`,
-        );
+        if (afterCoverageResult.report !== beforeCoverageResult.report) {
+          await this.log(
+            data.prRunId,
+            'info',
+            `Final coverage: ${afterCoverageResult.report.totalCoveragePercent}% total, ${afterCoverageResult.report.diffCoveragePercent ?? 'n/a'}% diff`,
+          );
+        }
       }
 
       const afterMetrics = extractBaselineMetrics(afterCoverageResult.report);
@@ -593,12 +575,15 @@ export class PrAnalysisProcessor {
       ) {
         workflowStatus = 'success';
         thresholdReached = true;
+      } else if (optimizationResult.stopReason === 'plateau') {
+        workflowStatus = 'plateau_reached';
       } else {
         workflowStatus = 'threshold_not_reached';
       }
 
       const blockers =
-        workflowStatus === 'threshold_not_reached'
+        workflowStatus === 'threshold_not_reached' ||
+        workflowStatus === 'plateau_reached'
           ? await classifyCoverageBlockers(
               runDir,
               afterMetrics.uncoveredLines,
@@ -606,11 +591,15 @@ export class PrAnalysisProcessor {
             )
           : [];
 
-      if (workflowStatus === 'threshold_not_reached' && blockers.length > 0) {
+      if (
+        (workflowStatus === 'threshold_not_reached' ||
+          workflowStatus === 'plateau_reached') &&
+        blockers.length > 0
+      ) {
         await this.log(
           data.prRunId,
           'info',
-          `Classified ${blockers.length} remaining uncovered line(s) after ${totalGenerationAttempts} generation attempt(s)`,
+          `Classified ${blockers.length} remaining uncovered line(s) after ${totalGenerationAttempts} generation attempt(s) across ${optimizationResult.iterationSummaries.length} iteration(s)`,
         );
       }
 
@@ -623,6 +612,8 @@ export class PrAnalysisProcessor {
         coverageBefore: baselineMetrics,
         coverageAfter: afterMetrics,
         blockers,
+        optimizationIterations: optimizationResult.iterationSummaries,
+        stopReason: optimizationResult.stopReason,
       });
 
       await this.persistCoverageResult({
@@ -766,11 +757,15 @@ export class PrAnalysisProcessor {
           this.testThresholdPercent,
         )
       : applyCoverageThreshold(
-          await this.coverageProvider.runDiffCoverage(
-            coverageXml,
-            compareRef,
+          await resolveDiffCoverageReport({
+            coverageXmlPath: coverageXml,
             repoDir,
-          ),
+            compareRef,
+            headBranch,
+            targetFiles: changedSourcePaths,
+            thresholdPercent: this.testThresholdPercent,
+            coverageProvider: this.coverageProvider,
+          }),
           this.testThresholdPercent,
         );
 
@@ -918,18 +913,17 @@ export class PrAnalysisProcessor {
     useCoveragePackageOnly: boolean;
     useAutoJsCoverage: boolean;
     logs: string[];
-  }): Promise<{
-    test: GeneratedTest | null;
-    passed: boolean;
-    attempts: number;
-    declaredDeps: string[];
-  }> {
+    generationMode?: 'NEW_TEST_FILE' | 'COVERAGE_GAP';
+    previousGeneratedContent?: string;
+  }): Promise<GenerateTestOutcome> {
     let lastFailureLogs = '';
     let previousContent = '';
     let lastTest: GeneratedTest | null = null;
     const declaredDeps: string[] = [];
+    let generationAttempts = 0;
 
     for (let attempt = 1; attempt <= this.maxGenerationAttempts; attempt++) {
+      generationAttempts = attempt;
       const generated = await this.generateTestForFile(
         params.runDir,
         params.file.path,
@@ -945,13 +939,22 @@ export class PrAnalysisProcessor {
               attemptNumber: attempt,
             }
           : undefined,
+        {
+          generationMode: params.generationMode,
+          previousGeneratedContent: params.previousGeneratedContent,
+        },
       );
 
       if (!generated) {
-        return { test: null, passed: false, attempts: attempt, declaredDeps };
+        return {
+          test: null,
+          passed: false,
+          attempts: attempt,
+          declaredDeps,
+          repairAttempts: 0,
+        };
       }
 
-      // Persist LLM usage for this attempt (including repair rounds)
       if (generated.usage) {
         await this.persistUsage(params.prRunId, null, generated.usage);
       }
@@ -983,7 +986,11 @@ export class PrAnalysisProcessor {
       if (existingArtifact) {
         await prisma.generatedTestArtifact.update({
           where: { id: existingArtifact.id },
-          data: { content: generated.content, filePath: generated.filePath },
+          data: {
+            content: generated.content,
+            filePath: generated.filePath,
+            status: 'PENDING',
+          },
         });
       } else {
         await prisma.generatedTestArtifact.create({
@@ -992,12 +999,16 @@ export class PrAnalysisProcessor {
             filePath: generated.filePath,
             targetFile: generated.targetFile,
             content: generated.content,
+            status: 'PENDING',
           },
         });
       }
 
       const canRunIsolated =
-        params.useCoveragePackageOnly || params.useAutoJsCoverage;
+        params.useCoveragePackageOnly ||
+        params.useAutoJsCoverage ||
+        params.repoSetup.isJavaScript ||
+        hasJsSourcePaths(params.sourcePaths);
 
       if (!canRunIsolated) {
         await this.log(
@@ -1010,77 +1021,238 @@ export class PrAnalysisProcessor {
           passed: false,
           attempts: attempt,
           declaredDeps,
+          repairAttempts: 0,
         };
       }
 
-      if (params.repoSetup.isPython || params.repoSetup.isJavaScript) {
-        await this.installGeneratedTestDependencies({
-          prRunId: params.prRunId,
-          runDir: params.runDir,
-          repoSetup: params.repoSetup,
-          rawInstallCommand: null,
-          generatedTests: [generated],
-          declaredTestDeps: parsed.declaredDeps,
-          repoPackages: params.repoPackages,
-          logs: params.logs,
-        });
-      }
+      const runSingleTest = async (): Promise<{
+        passed: boolean;
+        output: string;
+      }> => {
+        if (params.repoSetup.isPython || params.repoSetup.isJavaScript) {
+          await this.installGeneratedTestDependencies({
+            prRunId: params.prRunId,
+            runDir: params.runDir,
+            repoSetup: params.repoSetup,
+            rawInstallCommand: null,
+            generatedTests: [generated],
+            declaredTestDeps: parsed.declaredDeps,
+            repoPackages: params.repoPackages,
+            logs: params.logs,
+          });
+        }
 
-      const runTestCommand = params.repoSetup.wrapCommand(
-        params.useCoveragePackageOnly
-          ? buildPythonTestCommand(
-              params.sourcePaths,
-              [generated.filePath],
-              params.runDir,
-            )
-          : buildJsTestCommand(
-              params.sourcePaths,
-              [generated.filePath],
-              params.runDir,
-            ),
-      );
+        const runTestCommand = params.repoSetup.wrapCommand(
+          params.useCoveragePackageOnly
+            ? buildPythonTestCommand(
+                params.sourcePaths,
+                [generated.filePath],
+                params.runDir,
+              )
+            : buildJsTestCommand(
+                params.sourcePaths,
+                [generated.filePath],
+                params.runDir,
+              ),
+        );
 
-      await this.log(
-        params.prRunId,
-        'info',
-        `Running generated test (attempt ${attempt}/${this.maxGenerationAttempts}): ${generated.filePath}`,
-      );
-      const testResult = await runCommand(runTestCommand, params.runDir);
-      params.logs.push(testResult.stdout, testResult.stderr);
+        if (params.useAutoJsCoverage || params.repoSetup.isJavaScript) {
+          prepareJsTestHarness(params.runDir, params.sourcePaths, [
+            generated.filePath,
+          ]);
+        }
 
-      const passed = testResult.exitCode === 0;
-      await prisma.generatedTestArtifact.updateMany({
-        where: {
-          prRunId: params.prRunId,
-          filePath: generated.filePath,
-        },
-        data: { passed },
-      });
+        const testResult = await runCommand(runTestCommand, params.runDir);
+        params.logs.push(testResult.stdout, testResult.stderr);
+        const testOutput = `${testResult.stdout}\n${testResult.stderr}`;
+        const noTestsRan =
+          (params.useAutoJsCoverage || params.repoSetup.isJavaScript) &&
+          /# tests 0\b/m.test(testOutput) &&
+          testResult.exitCode === 0;
 
-      if (passed) {
+        const passed = testResult.exitCode === 0 && !noTestsRan;
+        return { passed, output: testOutput };
+      };
+
+      const initialResult = await runSingleTest();
+
+      if (initialResult.passed) {
+        await this.updateArtifactStatus(
+          params.prRunId,
+          generated.filePath,
+          true,
+          0,
+        );
         await this.log(
           params.prRunId,
           'info',
           `Generated test passed: ${generated.filePath}`,
         );
-        return { test: generated, passed: true, attempts: attempt, declaredDeps };
+        return {
+          test: generated,
+          passed: true,
+          attempts: attempt,
+          declaredDeps,
+          repairAttempts: 0,
+        };
       }
 
-      lastFailureLogs =
-        `${testResult.stdout}\n${testResult.stderr}`.slice(-4000);
+      const noTestsRan =
+        (params.useAutoJsCoverage || params.repoSetup.isJavaScript) &&
+        /# tests 0\b/m.test(initialResult.output) &&
+        !initialResult.output.includes('fail');
+
+      if (noTestsRan) {
+        lastFailureLogs = `node --test did not discover any tests: ${generated.filePath}\n${initialResult.output.slice(-2000)}`;
+        await this.log(
+          params.prRunId,
+          'error',
+          `Generated test reported pass but ran 0 tests for ${generated.filePath} (attempt ${attempt})`,
+        );
+        continue;
+      }
+
+      lastFailureLogs = initialResult.output.slice(-4000);
+      break;
+    }
+
+    if (!lastTest) {
+      return {
+        test: null,
+        passed: false,
+        attempts: generationAttempts,
+        declaredDeps,
+        repairAttempts: 0,
+      };
+    }
+
+    const repairResult = await this.testRepairService.repairUntilPassing({
+      maxAttempts: this.maxRepairAttempts,
+      runTest: async () => {
+        const runTestCommand = params.repoSetup.wrapCommand(
+          params.useCoveragePackageOnly
+            ? buildPythonTestCommand(
+                params.sourcePaths,
+                [lastTest!.filePath],
+                params.runDir,
+              )
+            : buildJsTestCommand(
+                params.sourcePaths,
+                [lastTest!.filePath],
+                params.runDir,
+              ),
+        );
+        if (params.useAutoJsCoverage || params.repoSetup.isJavaScript) {
+          prepareJsTestHarness(params.runDir, params.sourcePaths, [
+            lastTest!.filePath,
+          ]);
+        }
+        const testResult = await runCommand(runTestCommand, params.runDir);
+        params.logs.push(testResult.stdout, testResult.stderr);
+        const testOutput = `${testResult.stdout}\n${testResult.stderr}`;
+        const noTestsRan =
+          (params.useAutoJsCoverage || params.repoSetup.isJavaScript) &&
+          /# tests 0\b/m.test(testOutput) &&
+          testResult.exitCode === 0;
+        return {
+          passed: testResult.exitCode === 0 && !noTestsRan,
+          output: testOutput,
+        };
+      },
+      repair: async (failureLogs, prevContent, repairAttempt) => {
+        const repaired = await this.generateTestForFile(
+          params.runDir,
+          params.file.path,
+          params.baseRef,
+          params.headBranch,
+          params.testCommand,
+          params.report,
+          params.repoPackages,
+          {
+            failureLogs,
+            previousTestContent: prevContent,
+            attemptNumber: repairAttempt,
+          },
+          {
+            generationMode: params.generationMode ?? 'COVERAGE_GAP',
+            previousGeneratedContent: params.previousGeneratedContent,
+          },
+        );
+        if (repaired?.usage) {
+          await this.persistUsage(params.prRunId, null, repaired.usage);
+        }
+        if (repaired) {
+          lastTest = { ...repaired, content: parseGeneratedTestContent(repaired.content).content };
+        }
+        return repaired;
+      },
+      writeTest: async (content) => {
+        await writeFile(
+          join(params.runDir, lastTest!.filePath),
+          content,
+          'utf-8',
+        );
+        await prisma.generatedTestArtifact.updateMany({
+          where: {
+            prRunId: params.prRunId,
+            filePath: lastTest!.filePath,
+          },
+          data: { content },
+        });
+      },
+      log: async (message) => {
+        await this.log(params.prRunId, 'info', message);
+      },
+    });
+
+    await this.updateArtifactStatus(
+      params.prRunId,
+      lastTest.filePath,
+      repairResult.passed,
+      repairResult.repairAttempts,
+      repairResult.failureReason,
+    );
+
+    if (repairResult.passed) {
+      await this.log(
+        params.prRunId,
+        'info',
+        `Generated test passed after ${repairResult.repairAttempts} repair attempt(s): ${lastTest.filePath}`,
+      );
+    } else {
       await this.log(
         params.prRunId,
         'error',
-        `Generated test failed for ${generated.filePath} (attempt ${attempt}, exit ${testResult.exitCode}): ${lastFailureLogs.slice(-500)}`,
+        `Generated test failed after ${repairResult.repairAttempts} repair attempt(s): ${lastTest.filePath}`,
       );
     }
 
     return {
       test: lastTest,
-      passed: false,
-      attempts: this.maxGenerationAttempts,
+      passed: repairResult.passed,
+      attempts: generationAttempts,
       declaredDeps,
+      repairAttempts: repairResult.repairAttempts,
+      failureReason: repairResult.failureReason,
     };
+  }
+
+  private async updateArtifactStatus(
+    prRunId: string,
+    filePath: string,
+    passed: boolean,
+    repairAttempts: number,
+    failureReason?: string,
+  ) {
+    await prisma.generatedTestArtifact.updateMany({
+      where: { prRunId, filePath },
+      data: {
+        passed,
+        status: passed ? 'PASSING' : 'FAILED',
+        repairAttempts,
+        failureReason: failureReason ?? null,
+      },
+    });
   }
 
   private async generateTestForFile(
@@ -1095,6 +1267,10 @@ export class PrAnalysisProcessor {
       failureLogs: string;
       previousTestContent: string;
       attemptNumber: number;
+    },
+    options?: {
+      generationMode?: 'NEW_TEST_FILE' | 'COVERAGE_GAP';
+      previousGeneratedContent?: string;
     },
   ): Promise<GeneratedTestWithUsage | null> {
     const source = await this.repoProvider.getFileContent(repoDir, filePath);
@@ -1116,9 +1292,13 @@ export class PrAnalysisProcessor {
       pathsMatch(f.file, filePath),
     );
     const fileDiffCoverage = fileCoverageEntry?.diffCoveragePercent ?? null;
+    const fileUncoveredLines =
+      fileCoverageEntry?.uncoveredLines.length
+        ? fileCoverageEntry.uncoveredLines
+        : uncoveredForFile;
 
     const analyzer = getAnalyzerForFile(filePath);
-    const symbols = await analyzer.extractSymbols(source, filePath, []);
+    const symbols = await analyzer.extractSymbols(source, filePath, fileUncoveredLines);
     const exportedSymbols = extractExportedSymbols(source, filePath);
 
     const testFile = await prepareTestFileContext(
@@ -1128,6 +1308,21 @@ export class PrAnalysisProcessor {
       framework,
     );
 
+    const isConfigExport = isConfigOrPromptExportFile(source);
+    const isComplexService = isComplexServiceFile(source);
+    const smokeExports = isConfigExport ? suggestSmokeTestExports(source) : [];
+
+    const generationMode =
+      options?.generationMode === 'COVERAGE_GAP'
+        ? GenerationMode.COVERAGE_GAP
+        : testFile.isUpdatingExistingTest || options?.previousGeneratedContent
+          ? GenerationMode.COVERAGE_GAP
+          : GenerationMode.NEW_TEST_FILE;
+
+    const coverageReport = fileCoverageEntry
+      ? `File: ${filePath}\nDiff coverage: ${fileDiffCoverage?.toFixed(1) ?? 'n/a'}%\nUncovered lines: ${fileUncoveredLines.join(', ')}`
+      : undefined;
+
     const result = await this.llmProvider.generateTests({
       language,
       framework,
@@ -1135,7 +1330,7 @@ export class PrAnalysisProcessor {
       diff,
       source,
       existingTests: testFile.existingTests,
-      uncoveredLines: uncoveredForFile.join(', ') || 'unknown',
+      uncoveredLines: fileUncoveredLines.join(', ') || 'unknown',
       symbols,
       repoPackages,
       useFullSource: true,
@@ -1146,6 +1341,12 @@ export class PrAnalysisProcessor {
       attemptNumber: repair?.attemptNumber,
       testOutputPath: testFile.testOutputPath,
       isUpdatingExistingTest: testFile.isUpdatingExistingTest,
+      generationMode,
+      previousGeneratedTests: options?.previousGeneratedContent,
+      coverageReport,
+      isConfigExportFile: isConfigExport,
+      isComplexServiceFile: isComplexService,
+      smokeTestExports: smokeExports,
     });
     return result;
   }
