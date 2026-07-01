@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# Trace files
+*.json.trace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# OpenMemory - IDE/Assistant specific rules
+.cursor/rules/openmemory.mdc
+CLAUDE.md
+/coverage/
+# Generated test-coverage reports, but NOT the dispatch source dir of the same name.
+!service/src/dispatch/coverage/
+
+.pnpm-store/
+
+/coverage-service/worker/.venv-tools/

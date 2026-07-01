@@ -1,0 +1,344 @@
+import { execFile, spawn } from 'child_process';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { promisify } from 'util';
+
+import { createAppAuth } from '@octokit/auth-app';
+import { Octokit } from '@octokit/rest';
+
+import {
+  orderedTestFileCandidates,
+  testFileBasenameMatchesSource,
+} from '../test-paths';
+import type { ChangedFile } from '../types';
+
+import type {
+  CheckoutPROptions,
+  CloneOptions,
+  RepositoryProvider,
+} from './repository-provider';
+
+const execFileAsync = promisify(execFile);
+
+export type GitHubAuthMode = 'app' | 'pat';
+
+export interface GitHubProviderConfig {
+  authMode: GitHubAuthMode;
+  pat?: string;
+  appId?: string;
+  privateKey?: string;
+  /** Static installation ID (single-org / Option A). Takes priority over the resolver. */
+  installationId?: string;
+  /**
+   * Dynamic resolver for multi-tenant GitHub App (Option C).
+   * Called with the `owner/repo` string and must return the installation ID
+   * for that specific repo, or null if unknown.
+   */
+  resolveInstallationId?: (githubRepo: string) => Promise<string | null>;
+}
+
+export class GitHubProvider implements RepositoryProvider {
+  readonly name = 'github';
+
+  constructor(private readonly config: GitHubProviderConfig) {}
+
+  private async resolveId(githubRepo?: string): Promise<string> {
+    // Static ID wins — keeps Option A working with zero changes.
+    if (this.config.installationId) return this.config.installationId;
+
+    if (this.config.resolveInstallationId && githubRepo) {
+      const id = await this.config.resolveInstallationId(githubRepo);
+      if (id) return id;
+    }
+
+    throw new Error(
+      `No GitHub App installation ID found for ${githubRepo ?? 'unknown repo'}. ` +
+      'Install the app on this repo or set GITHUB_APP_INSTALLATION_ID.',
+    );
+  }
+
+  private async getOctokit(githubRepo?: string): Promise<Octokit> {
+    if (this.config.authMode === 'app') {
+      if (!this.config.appId || !this.config.privateKey) {
+        throw new Error('GitHub App auth requires appId and privateKey');
+      }
+      const installationId = parseInt(await this.resolveId(githubRepo), 10);
+      const auth = createAppAuth({
+        appId: this.config.appId,
+        privateKey: this.config.privateKey.replace(/\\n/g, '\n'),
+        installationId,
+      });
+      return new Octokit({ auth: (await auth({ type: 'installation' })).token });
+    }
+
+    if (!this.config.pat) {
+      throw new Error('PAT auth requires GITHUB_PAT');
+    }
+    return new Octokit({ auth: this.config.pat });
+  }
+
+  private async getCloneUrl(repoUrl: string): Promise<string> {
+    if (this.config.authMode === 'pat' && this.config.pat) {
+      const url = new URL(repoUrl.replace('git@github.com:', 'https://github.com/'));
+      url.username = 'x-access-token';
+      url.password = this.config.pat;
+      return url.toString();
+    }
+
+    const match = repoUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+    if (!match) return repoUrl;
+
+    const githubRepo = match[1]; // 'owner/repo'
+    const installationId = parseInt(await this.resolveId(githubRepo), 10);
+
+    const auth = createAppAuth({
+      appId: this.config.appId!,
+      privateKey: this.config.privateKey!.replace(/\\n/g, '\n'),
+      installationId,
+    });
+    const { token } = await auth({ type: 'installation' });
+
+    const url = new URL(`https://github.com/${githubRepo}.git`);
+    url.username = 'x-access-token';
+    url.password = token;
+    return url.toString();
+  }
+
+  async getPullRequest(
+    githubRepo: string,
+    prNumber: number,
+  ): Promise<{
+    number: number;
+    headBranch: string;
+    headSha: string;
+    headRepo: string;
+    baseBranch: string;
+  }> {
+    const [owner, repo] = githubRepo.split('/');
+    const octokit = await this.getOctokit(githubRepo);
+    const { data } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: prNumber,
+    });
+
+    return {
+      number: data.number,
+      headBranch: data.head.ref,
+      headSha: data.head.sha,
+      headRepo: data.head.repo?.full_name ?? `${owner}/${repo}`,
+      baseBranch: data.base.ref,
+    };
+  }
+
+  async clone(options: CloneOptions): Promise<void> {
+    const cloneUrl = await this.getCloneUrl(options.repoUrl);
+    const args = ['clone', '--depth', '1'];
+    if (options.branch) {
+      args.push('--branch', options.branch);
+    }
+    args.push(cloneUrl, options.targetDir);
+
+    await this.runGit(args);
+  }
+
+  async checkoutPR(options: CheckoutPROptions): Promise<void> {
+    const { repoDir, baseBranch, headBranch, upstreamRepo } = options;
+
+    if (upstreamRepo) {
+      const upstreamUrl = await this.getCloneUrl(
+        `https://github.com/${upstreamRepo}.git`,
+      );
+      await this.runGit(['remote', 'add', 'upstream', upstreamUrl], repoDir);
+      await this.runGit(
+        this.fetchBranchArgs('upstream', baseBranch, '--depth', '1'),
+        repoDir,
+      );
+    } else {
+      await this.runGit(
+        this.fetchBranchArgs('origin', baseBranch, '--depth', '1'),
+        repoDir,
+      );
+    }
+
+    await this.runGit(
+      this.fetchBranchArgs('origin', headBranch, '--depth', '1'),
+      repoDir,
+    );
+    await this.runGit(['checkout', headBranch], repoDir);
+
+    const baseRef = upstreamRepo
+      ? `upstream/${baseBranch}`
+      : `origin/${baseBranch}`;
+    await this.ensureMergeBase(repoDir, baseRef, 'HEAD', headBranch);
+  }
+
+  /** Fetch a branch and update its remote-tracking ref (required for merge-base). */
+  private fetchBranchArgs(
+    remote: string,
+    branch: string,
+    depthFlag: '--depth' | '--deepen',
+    depth: string,
+  ): string[] {
+    return [
+      'fetch',
+      remote,
+      `${branch}:refs/remotes/${remote}/${branch}`,
+      depthFlag,
+      depth,
+    ];
+  }
+
+  /** Deepen shallow fetches until git can compute a merge base for diff-cover. */
+  private async ensureMergeBase(
+    repoDir: string,
+    baseRef: string,
+    headRef = 'HEAD',
+    headBranch?: string,
+  ): Promise<void> {
+    if (await this.hasMergeBase(repoDir, baseRef, headRef)) return;
+
+    const [remote, ...branchParts] = baseRef.split('/');
+    const baseBranch = branchParts.join('/');
+
+    for (let attempt = 0; attempt < 50; attempt++) {
+      await this.runGit(['fetch', '--deepen', '50'], repoDir);
+      try {
+        await this.runGit(
+          this.fetchBranchArgs(remote, baseBranch, '--deepen', '50'),
+          repoDir,
+        );
+      } catch {
+        // Base branch may only exist on a different remote.
+      }
+      if (headBranch) {
+        try {
+          await this.runGit(
+            this.fetchBranchArgs('origin', headBranch, '--deepen', '50'),
+            repoDir,
+          );
+        } catch {
+          // Head branch may only exist on a fork remote.
+        }
+      }
+      if (await this.hasMergeBase(repoDir, baseRef, headRef)) return;
+    }
+
+    throw new Error(
+      `No merge base between ${baseRef} and ${headRef} after deepening shallow clone`,
+    );
+  }
+
+  private async hasMergeBase(
+    repoDir: string,
+    refA: string,
+    refB: string,
+  ): Promise<boolean> {
+    try {
+      await execFileAsync('git', ['merge-base', refA, refB], { cwd: repoDir });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getChangedFiles(
+    repoDir: string,
+    compareRef: string,
+    headBranch: string,
+  ): Promise<ChangedFile[]> {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['diff', '--name-status', `${compareRef}...${headBranch}`],
+      { cwd: repoDir },
+    );
+
+    return stdout
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [status, ...rest] = line.split('\t');
+        const path = rest[rest.length - 1];
+        const mappedStatus =
+          status === 'A'
+            ? 'added'
+            : status === 'D'
+              ? 'deleted'
+              : status.startsWith('R')
+                ? 'renamed'
+                : 'modified';
+        return { path, status: mappedStatus as ChangedFile['status'] };
+      });
+  }
+
+  async getFileContent(repoDir: string, filePath: string): Promise<string> {
+    const fullPath = join(repoDir, filePath);
+    if (!existsSync(fullPath)) return '';
+    const { readFile } = await import('fs/promises');
+    return readFile(fullPath, 'utf-8');
+  }
+
+  async findExistingTests(
+    repoDir: string,
+    sourceFile: string,
+    framework = 'pytest',
+  ): Promise<string[]> {
+    const { readdir } = await import('fs/promises');
+
+    const found = new Set<string>();
+    const add = (rel: string) => found.add(rel.replace(/\\/g, '/'));
+
+    for (const candidate of orderedTestFileCandidates(sourceFile, framework)) {
+      const full = join(repoDir, candidate);
+      if (existsSync(full)) {
+        add(candidate);
+      }
+    }
+
+    for (const testRoot of ['tests', 'test', 'src'] as const) {
+      try {
+        const entries = await readdir(join(repoDir, testRoot), {
+          recursive: true,
+        });
+        for (const entry of entries) {
+          const name = String(entry);
+          const rel = `${testRoot}/${name}`.replace(/\\/g, '/');
+          if (
+            !(
+              name.endsWith('.test.ts') ||
+              name.endsWith('.test.tsx') ||
+              name.endsWith('.test.js') ||
+              name.endsWith('.test.jsx') ||
+              name.endsWith('.spec.ts') ||
+              name.endsWith('.spec.js') ||
+              name.startsWith('test_')
+            ) ||
+            !testFileBasenameMatchesSource(rel, sourceFile)
+          ) {
+            continue;
+          }
+          const full = join(repoDir, rel);
+          if (existsSync(full)) {
+            add(rel);
+          }
+        }
+      } catch {
+        // no directory
+      }
+    }
+
+    return [...found];
+  }
+
+  private async runGit(args: string[], cwd?: string): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('git', args, { cwd, stdio: 'pipe' });
+      let stderr = '';
+      proc.stderr.on('data', (d) => (stderr += d.toString()));
+      proc.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`git ${args.join(' ')} failed: ${stderr}`));
+      });
+    });
+  }
+}

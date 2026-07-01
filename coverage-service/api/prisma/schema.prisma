@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Repository {
+  id                   String          @id @default(cuid())
+  githubRepo           String          @unique
+  defaultBranch        String          @default("main")
+  coverageCommand      String          @default("npm test -- --coverage")
+  testCommand          String          @default("npm test")
+  installCommand       String          @default("")
+  githubInstallationId String?         // set automatically when app is installed via webhook
+  createdAt            DateTime        @default(now())
+  pullRequestRuns      PullRequestRun[]
+  testGenerationRuns   TestGenerationRun[]
+}
+
+enum PrRunStatus {
+  PENDING
+  CLONING
+  RUNNING_COVERAGE
+  ANALYZING
+  GENERATING_TESTS
+  RUNNING_TESTS
+  RECALCULATING
+  COMPLETED
+  FAILED
+}
+
+enum ExecutionStatus {
+  PASS
+  FAIL
+  SKIPPED
+  PARTIAL
+}
+
+model PullRequestRun {
+  id           String                @id @default(cuid())
+  repositoryId String
+  repository   Repository            @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  prNumber     Int
+  headBranch   String?
+  headSha      String?
+  baseBranch   String?
+  status       PrRunStatus           @default(PENDING)
+  startedAt    DateTime              @default(now())
+  completedAt  DateTime?
+  coverageResult CoverageResult?
+  generatedTests GeneratedTestArtifact[]
+  coverageIterations CoverageIteration[]
+  executionLogs  ExecutionLog[]
+  llmUsage       LlmUsageRecord[]
+
+  @@index([repositoryId, prNumber])
+}
+
+model CoverageResult {
+  id                   String         @id @default(cuid())
+  prRunId              String         @unique
+  prRun                PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  beforeCoverage       Float?
+  afterCoverage        Float?
+  diffCoverageBefore   Float?
+  diffCoverageAfter    Float?
+  beforeFileCoverage   Json?
+  afterFileCoverage    Json?
+  generatedTestsCount  Int            @default(0)
+  filesImproved        String[]       @default([])
+  executionStatus      ExecutionStatus @default(SKIPPED)
+  workflowSummary      Json?
+  createdAt            DateTime       @default(now())
+}
+
+enum TestGenerationStatus {
+  PENDING
+  CLONING
+  GENERATING_TESTS
+  COMPLETED
+  FAILED
+}
+
+model TestGenerationRun {
+  id           String               @id @default(cuid())
+  repositoryId String
+  repository   Repository           @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  prNumber     Int
+  targetFile   String
+  headBranch   String?
+  baseBranch   String?
+  status       TestGenerationStatus @default(PENDING)
+  attempts     Int                  @default(0)
+  startedAt    DateTime             @default(now())
+  completedAt  DateTime?
+  generatedTest GeneratedTestArtifact?
+  executionLogs TestGenerationLog[]
+  llmUsage      LlmUsageRecord[]
+
+  @@index([repositoryId, prNumber])
+}
+
+model TestGenerationLog {
+  id        String            @id @default(cuid())
+  runId     String
+  run       TestGenerationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  level     String            @default("info")
+  message   String            @db.Text
+  createdAt DateTime          @default(now())
+}
+
+enum GeneratedTestStatus {
+  PENDING
+  PASSING
+  FAILED
+}
+
+model CoverageIteration {
+  id              String         @id @default(cuid())
+  prRunId         String
+  prRun           PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  iteration       Int
+  coverageBefore  Float
+  coverageAfter   Float?
+  coverageGain    Float?
+  generatedTests  Int            @default(0)
+  failedTests     Int            @default(0)
+  stopReason      String?
+  createdAt       DateTime       @default(now())
+  gaps            CoverageGap[]
+  testArtifacts   GeneratedTestArtifact[]
+
+  @@unique([prRunId, iteration])
+  @@index([prRunId])
+}
+
+model CoverageGap {
+  id           String            @id @default(cuid())
+  iterationId  String
+  iteration    CoverageIteration @relation(fields: [iterationId], references: [id], onDelete: Cascade)
+  filePath     String
+  coverage     Float
+  missingLines Int[]
+  priority     Float
+  createdAt    DateTime          @default(now())
+
+  @@index([iterationId])
+}
+
+model GeneratedTestArtifact {
+  id                    String             @id @default(cuid())
+  prRunId               String?
+  prRun                 PullRequestRun?    @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  coverageIterationId   String?
+  coverageIteration     CoverageIteration? @relation(fields: [coverageIterationId], references: [id], onDelete: SetNull)
+  testGenerationRunId   String?            @unique
+  testGenerationRun     TestGenerationRun? @relation(fields: [testGenerationRunId], references: [id], onDelete: Cascade)
+  filePath              String
+  targetFile            String
+  content               String             @db.Text
+  passed                Boolean?
+  status                GeneratedTestStatus @default(PENDING)
+  repairAttempts        Int                @default(0)
+  coverageContribution  Float?
+  failureReason         String?            @db.Text
+  testCategory          String?
+  integrationTestReason String?            @db.Text
+  createdAt             DateTime           @default(now())
+
+  @@index([coverageIterationId])
+}
+
+model ExecutionLog {
+  id        String         @id @default(cuid())
+  prRunId   String
+  prRun     PullRequestRun @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  level     String         @default("info")
+  message   String         @db.Text
+  createdAt DateTime       @default(now())
+}
+
+model LlmUsageRecord {
+  id                  String             @id @default(cuid())
+  /// Set when the LLM call belongs to a full PR analysis run
+  prRunId             String?
+  prRun               PullRequestRun?    @relation(fields: [prRunId], references: [id], onDelete: Cascade)
+  /// Set when the LLM call belongs to a standalone test-generation run
+  testGenerationRunId String?
+  testGenerationRun   TestGenerationRun? @relation(fields: [testGenerationRunId], references: [id], onDelete: Cascade)
+
+  provider            String             // 'openai' | 'anthropic' | 'local'
+  modelName           String
+  promptTokens        Int
+  completionTokens    Int
+  totalTokens         Int
+  /// USD estimated at write-time from baked-in pricing table; null for unknown/local models
+  estimatedCostUsd    Float?
+  createdAt           DateTime           @default(now())
+
+  @@index([prRunId])
+  @@index([testGenerationRunId])
+}

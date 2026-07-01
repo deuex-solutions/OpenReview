@@ -1,0 +1,8 @@
+packages:
+  - 'core'
+  - 'cli'
+  - 'action'
+  - 'service'
+  - 'coverage-service/lib'
+  - 'coverage-service/api'
+  - 'coverage-service/worker'

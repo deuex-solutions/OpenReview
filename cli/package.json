@@ -1,0 +1,22 @@
+{
+  "name": "openreview",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "openreview": "dist/main.mjs"
+  },
+  "main": "dist/main.mjs",
+  "types": "dist/main.d.mts",
+  "scripts": {
+    "build": "tsdown src/main.ts --format esm --dts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openreview/core": "workspace:*",
+    "@types/express": "^5.0.6",
+    "commander": "^14.0.3",
+    "express": "^5.2.1",
+    "ora": "^8.2.0"
+  }
+}
